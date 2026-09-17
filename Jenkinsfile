@@ -101,7 +101,9 @@ pipeline {
             steps {
                 script {
                     echo "🧪 运行单元测试（门禁：存在失败用例即中断流水线）..."
-                    sh ". ${env.TOOLCHAIN_ROOT}/env.sh && flutter test"
+                    def directLocalhost = 'export no_proxy="127.0.0.1,localhost,::1" NO_PROXY="127.0.0.1,localhost,::1"'
+
+                    sh ". ${env.TOOLCHAIN_ROOT}/env.sh && ${directLocalhost} && flutter test"
 
                     // 以下为 best effort 的 JUnit 报告生成与发布：
                     // 门禁已在上一步完成，这里任何环节失败都只打印警告，不影响构建结论
@@ -109,7 +111,7 @@ pipeline {
                         echo "📊 生成并发布 JUnit 测试报告..."
                         sh ". ${env.TOOLCHAIN_ROOT}/env.sh && dart pub global activate junitreport"
                         sh 'mkdir -p reports'
-                        sh ". ${env.TOOLCHAIN_ROOT}/env.sh && flutter test --machine > reports/test-report.json"
+                        sh ". ${env.TOOLCHAIN_ROOT}/env.sh && ${directLocalhost} && flutter test --machine > reports/test-report.json"
                         // env.sh 未把 pub 全局 bin（$PUB_CACHE/bin，tojunit 安装于此）加入 PATH，这里显式补上
                         sh ". ${env.TOOLCHAIN_ROOT}/env.sh && export PATH=\"\$PUB_CACHE/bin:\$PATH\" && tojunit --output reports/junit.xml < reports/test-report.json"
                         junit allowEmptyResults: true, testResults: 'reports/junit.xml'
