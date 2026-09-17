@@ -82,7 +82,9 @@ pipeline {
 
         stage('安装依赖') {
             steps {
-                sh "source ${env.TOOLCHAIN_ROOT}/env.sh && flutter pub get"
+                // 用 POSIX 的 '.' 而不是 bash 专有的 'source'：Jenkins 的 sh 步骤在
+                // Debian/Ubuntu 系下是 /bin/sh（dash），不认识 source
+                sh ". ${env.TOOLCHAIN_ROOT}/env.sh && flutter pub get"
             }
         }
 
@@ -90,7 +92,7 @@ pipeline {
             steps {
                 script {
                     echo "🔍 运行 flutter analyze（warning / info 不阻断，仅 error 阻断）..."
-                    sh "source ${env.TOOLCHAIN_ROOT}/env.sh && flutter analyze --no-fatal-infos --no-fatal-warnings"
+                    sh ". ${env.TOOLCHAIN_ROOT}/env.sh && flutter analyze --no-fatal-infos --no-fatal-warnings"
                 }
             }
         }
@@ -99,17 +101,17 @@ pipeline {
             steps {
                 script {
                     echo "🧪 运行单元测试（门禁：存在失败用例即中断流水线）..."
-                    sh "source ${env.TOOLCHAIN_ROOT}/env.sh && flutter test"
+                    sh ". ${env.TOOLCHAIN_ROOT}/env.sh && flutter test"
 
                     // 以下为 best effort 的 JUnit 报告生成与发布：
                     // 门禁已在上一步完成，这里任何环节失败都只打印警告，不影响构建结论
                     try {
                         echo "📊 生成并发布 JUnit 测试报告..."
-                        sh "source ${env.TOOLCHAIN_ROOT}/env.sh && dart pub global activate junitreport"
+                        sh ". ${env.TOOLCHAIN_ROOT}/env.sh && dart pub global activate junitreport"
                         sh 'mkdir -p reports'
-                        sh "source ${env.TOOLCHAIN_ROOT}/env.sh && flutter test --machine > reports/test-report.json"
+                        sh ". ${env.TOOLCHAIN_ROOT}/env.sh && flutter test --machine > reports/test-report.json"
                         // env.sh 未把 pub 全局 bin（$PUB_CACHE/bin，tojunit 安装于此）加入 PATH，这里显式补上
-                        sh "source ${env.TOOLCHAIN_ROOT}/env.sh && export PATH=\"\$PUB_CACHE/bin:\$PATH\" && tojunit --output reports/junit.xml < reports/test-report.json"
+                        sh ". ${env.TOOLCHAIN_ROOT}/env.sh && export PATH=\"\$PUB_CACHE/bin:\$PATH\" && tojunit --output reports/junit.xml < reports/test-report.json"
                         junit allowEmptyResults: true, testResults: 'reports/junit.xml'
                     } catch (Exception e) {
                         echo "⚠️ JUnit 测试报告生成/发布失败，已忽略（不影响构建结论）: ${e.message}"
@@ -139,7 +141,7 @@ pipeline {
             steps {
                 script {
                     echo "📦 构建 release APK（versionCode = Jenkins 构建号 ${env.BUILD_NUMBER}）..."
-                    sh "source ${env.TOOLCHAIN_ROOT}/env.sh && flutter build apk --release --build-number=${env.BUILD_NUMBER}"
+                    sh ". ${env.TOOLCHAIN_ROOT}/env.sh && flutter build apk --release --build-number=${env.BUILD_NUMBER}"
                     archiveArtifacts artifacts: 'build/app/outputs/flutter-apk/app-release.apk', fingerprint: true
                     sh "ls -lh ${env.APK_PATH}"
                 }
@@ -166,8 +168,8 @@ pipeline {
                             git config user.name "Beancount-Trans CI"
                             git config user.email "ci@beancount-trans.local"
                         '''
-                        sh "source ${env.TOOLCHAIN_ROOT}/env.sh && npm ci --no-audit --no-fund"
-                        sh "source ${env.TOOLCHAIN_ROOT}/env.sh && npm run semantic-release"
+                        sh ". ${env.TOOLCHAIN_ROOT}/env.sh && npm ci --no-audit --no-fund"
+                        sh ". ${env.TOOLCHAIN_ROOT}/env.sh && npm run semantic-release"
                     }
 
                     // npm run semantic-release 即 semantic-release --config release.config.mjs：
