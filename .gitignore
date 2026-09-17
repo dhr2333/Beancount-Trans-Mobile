@@ -5,6 +5,10 @@ build/
 .flutter-plugins
 .flutter-plugins-dependencies
 
+# CI/CD
+node_modules/
+reports/
+
 # IDE
 .idea/
 .vscode/

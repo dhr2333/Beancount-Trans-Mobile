@@ -1,0 +1,24 @@
+{
+  "name": "beancount-trans-mobile",
+  "version": "1.0.0",
+  "description": "Semantic-release configuration for Beancount-Trans mobile app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "semantic-release": "semantic-release --config release.config.mjs"
+  },
+  "engines": {
+    "node": ">=20.8.1"
+  },
+  "devDependencies": {
+    "@semantic-release/changelog": "^7.0.0",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/exec": "^7.1.0",
+    "@semantic-release/git": "^11.0.1",
+    "@semantic-release/github": "^12.0.9",
+    "@semantic-release/npm": "^13.1.5",
+    "@semantic-release/release-notes-generator": "^14.1.1",
+    "conventional-changelog-conventionalcommits": "^10.4.0",
+    "semantic-release": "^25.0.9"
+  }
+}
