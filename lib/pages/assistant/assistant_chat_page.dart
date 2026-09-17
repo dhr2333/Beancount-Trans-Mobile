@@ -6,8 +6,22 @@ import '../../core/format.dart';
 import '../../core/sse_client.dart';
 import '../../models/assistant.dart';
 import '../../services/assistant_service.dart';
+import '../../services/todo_service.dart';
 import '../../widgets/status_chip.dart';
 import '../fava_page.dart';
+import '../profile_page.dart';
+import '../reconciliation/reconciliation_form_page.dart';
+import '../review/review_list_page.dart';
+import '../todo/todo_list_page.dart';
+import 'assistant_drawer.dart';
+
+/// 空白会话页展示的示例问题。
+const List<String> kExampleQuestions = [
+  '提供一份消费洞察',
+  '有什么令人意外的消费发现？',
+  '帮我写一份月度总结',
+  '最近有哪些大额消费？',
+];
 
 /// Copilot 对话页：消息流 + SSE 流式生成。
 ///
@@ -24,7 +38,9 @@ class AssistantChatPage extends StatefulWidget {
 }
 
 class _AssistantChatPageState extends State<AssistantChatPage> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final TextEditingController _input = TextEditingController();
+  final TextEditingController _sessionSearch = TextEditingController();
   final ScrollController _scroll = ScrollController();
 
   final List<ChatMessage> _messages = [];
@@ -36,7 +52,12 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
   bool _loading = true;
   bool _sending = false;
   bool _deepThink = false;
-  bool _sessionsChanged = false;
+
+  // ------------------------------------------------------------ 抽屉数据
+  List<ChatSessionSummary> _sessions = const [];
+  bool _drawerLoading = false;
+  String? _drawerError;
+  int _todoBadge = 0;
 
   CancelToken? _cancelToken;
   int _activeRequestId = 0;
@@ -53,16 +74,43 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
   void dispose() {
     _cancelToken?.cancel();
     _input.dispose();
+    _sessionSearch.dispose();
     _scroll.dispose();
     super.dispose();
   }
 
   Future<void> _bootstrap() async {
     await _loadStatus();
+    // 抽屉数据（会话列表 + 待办徽标）不阻塞主流程
+    _refreshDrawerData();
     if (_sessionId.isNotEmpty) {
       await _loadSession(_sessionId);
     } else {
       setState(() => _loading = false);
+    }
+  }
+
+  /// 拉取抽屉所需的会话列表与待办徽标数。
+  Future<void> _refreshDrawerData() async {
+    if (!mounted) return;
+    setState(() {
+      _drawerLoading = true;
+      _drawerError = null;
+    });
+    try {
+      final results = await Future.wait<Object>([
+        AssistantService.instance.listSessions(search: _sessionSearch.text),
+        TodoService.instance.badgeCount(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _sessions = results[0] as List<ChatSessionSummary>;
+        _todoBadge = results[1] as int;
+      });
+    } on ApiException catch (error) {
+      if (mounted) setState(() => _drawerError = error.message);
+    } finally {
+      if (mounted) setState(() => _drawerLoading = false);
     }
   }
 
@@ -85,6 +133,8 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
       if (!mounted) return;
       final messages = detail.messages.map(ChatMessage.fromStored).toList();
       setState(() {
+        // 记录当前会话，后续提问才会写入该会话。
+        _sessionId = id;
         _title = detail.title;
         _messages
           ..clear()
@@ -116,7 +166,9 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
       case 'session':
         final userMessageId = data['user_message_id'];
         final user = _lastUserMessage();
-        if (user != null && userMessageId is String && userMessageId.isNotEmpty) {
+        if (user != null &&
+            userMessageId is String &&
+            userMessageId.isNotEmpty) {
           user.id = userMessageId;
         }
         final assistantMessageId = data['assistant_message_id'];
@@ -128,7 +180,6 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
         }
         final newId = '${data['id'] ?? ''}';
         if (_sessionId.isEmpty && newId.isNotEmpty) _sessionId = newId;
-        _sessionsChanged = true;
         break;
 
       case 'status':
@@ -154,15 +205,21 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
       case 'tool_end':
         final bql = data['bql'];
         final preview = data['result_preview'];
-        if (bql is String && bql.isNotEmpty && preview is String && preview.isNotEmpty) {
+        if (bql is String &&
+            bql.isNotEmpty &&
+            preview is String &&
+            preview.isNotEmpty) {
           _appendQuery(
             QueryRecord(
               bql: bql,
               resultPreview: preview,
-              favaPath: data['fava_path'] is String ? data['fava_path'] as String : null,
+              favaPath: data['fava_path'] is String
+                  ? data['fava_path'] as String
+                  : null,
               report: data['report'] is Map
                   ? QueryReportLink.fromJson(
-                      (data['report'] as Map).cast<String, Object?>())
+                      (data['report'] as Map).cast<String, Object?>(),
+                    )
                   : null,
             ),
           );
@@ -184,14 +241,18 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
         final rawQueries = data['queries'];
         assistant.queries = rawQueries is List
             ? rawQueries
-                .whereType<Map>()
-                .map((e) => QueryRecord.fromJson(e.cast<String, Object?>()))
-                .toList()
+                  .whereType<Map>()
+                  .map((e) => QueryRecord.fromJson(e.cast<String, Object?>()))
+                  .toList()
             : [];
         final thinking = '${data['thinking'] ?? ''}';
         final reasoning = '${data['reasoning'] ?? ''}';
-        assistant.thinking = thinking.isNotEmpty ? thinking : assistant.thinking;
-        assistant.reasoning = reasoning.isNotEmpty ? reasoning : assistant.reasoning;
+        assistant.thinking = thinking.isNotEmpty
+            ? thinking
+            : assistant.thinking;
+        assistant.reasoning = reasoning.isNotEmpty
+            ? reasoning
+            : assistant.reasoning;
         assistant.streaming = false;
         assistant.status = null;
         assistant.thinkingExpanded = false;
@@ -204,7 +265,6 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
           final user = _lastUserMessage();
           if (user != null) user.id = userMessageId;
         }
-        _sessionsChanged = true;
         break;
 
       case 'error':
@@ -401,9 +461,110 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
     );
   }
 
+  // ---------------------------------------------------------------- 抽屉
+
+  /// 关闭抽屉（未打开时为空操作）。
+  void _closeDrawer() => _scaffoldKey.currentState?.closeDrawer();
+
+  /// 重置为空白新会话（不关闭抽屉）。
+  void _resetChat() {
+    _activeRequestId += 1;
+    _cancelToken?.cancel();
+    _cancelToken = null;
+    setState(() {
+      _messages.clear();
+      _sessionId = '';
+      _title = '';
+      _error = null;
+      _sending = false;
+      _loading = false;
+    });
+  }
+
+  void _onNewChat() {
+    _closeDrawer();
+    _resetChat();
+  }
+
+  Future<void> _onSelectSession(String id) async {
+    _closeDrawer();
+    if (id == _sessionId) return;
+    await _loadSession(id);
+    // 刷新列表高亮
+    await _refreshDrawerData();
+  }
+
+  Future<void> _onDeleteSession(ChatSessionSummary session) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('删除会话'),
+        content: Text('确认删除「${session.title}」？删除后不可恢复。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await AssistantService.instance.deleteSession(session.id);
+    } on ApiException catch (error) {
+      if (mounted) _notify(error.message);
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _sessions = _sessions.where((e) => e.id != session.id).toList();
+    });
+    // 删除的是当前会话时回到空白新对话
+    if (session.id == _sessionId) _resetChat();
+  }
+
+  void _onOpenProfile() {
+    _closeDrawer();
+    Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => const ProfilePage()));
+  }
+
+  Future<void> _onOpenTodo() async {
+    _closeDrawer();
+    try {
+      final summary = await TodoService.instance.summary();
+      if (!mounted) return;
+      if (summary.items.isEmpty) {
+        _notify('暂无到期待办');
+        return;
+      }
+
+      final item = summary.items.first;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => summary.items.length == 1
+              ? (item.kind == TodoKind.reconciliation
+                    ? ReconciliationFormPage(taskId: item.taskId!)
+                    : const ReviewListPage())
+              : const TodoListPage(),
+        ),
+      );
+      // 返回后刷新抽屉徽标
+      await _refreshDrawerData();
+    } on ApiException catch (error) {
+      if (mounted) _notify(error.message);
+    }
+  }
+
   // ---------------------------------------------------------------- 工具
 
-  String _newId() => 'local-${DateTime.now().microsecondsSinceEpoch}-${_idSeed++}';
+  String _newId() =>
+      'local-${DateTime.now().microsecondsSinceEpoch}-${_idSeed++}';
 
   ChatMessage? _lastAssistantMessage() {
     if (_messages.isEmpty) return null;
@@ -438,41 +599,54 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
   Widget build(BuildContext context) {
     final canChat = _status?.canChat ?? false;
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) return;
-        Navigator.of(context).pop(_sessionsChanged);
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(
-            _title.isNotEmpty
-                ? _title
-                : (_sessionId.isEmpty ? '新对话' : 'Copilot 对话'),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          actions: [
-            if (_status != null && !canChat)
-              const Padding(
-                padding: EdgeInsets.only(right: 12),
-                child: Center(
-                  child: StatusChip(label: '助手不可用', tone: ChipTone.danger),
-                ),
-              ),
-          ],
-        ),
-        body: _loading && _messages.isEmpty
-            ? const Center(child: CircularProgressIndicator())
-            : Column(
-                children: [
-                  if (_error != null) _errorBanner(_error!),
-                  Expanded(child: _buildMessageList()),
-                  _buildInputBar(canChat),
-                ],
-              ),
+    return Scaffold(
+      key: _scaffoldKey,
+      drawer: AssistantDrawer(
+        searchController: _sessionSearch,
+        sessions: _sessions,
+        loading: _drawerLoading,
+        error: _drawerError,
+        currentSessionId: _sessionId,
+        todoBadge: _todoBadge,
+        onSearchSubmitted: _refreshDrawerData,
+        onNewChat: _onNewChat,
+        onSelectSession: _onSelectSession,
+        onDeleteSession: _onDeleteSession,
+        onOpenTodo: _onOpenTodo,
+        onOpenProfile: _onOpenProfile,
+        onRefresh: _refreshDrawerData,
       ),
+      // 打开抽屉时刷新会话列表与待办徽标
+      onDrawerChanged: (isOpened) {
+        if (isOpened) _refreshDrawerData();
+      },
+      appBar: AppBar(
+        title: Text(
+          _title.isNotEmpty
+              ? _title
+              : (_sessionId.isEmpty ? '新对话' : 'Copilot 对话'),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        actions: [
+          if (_status != null && !canChat)
+            const Padding(
+              padding: EdgeInsets.only(right: 12),
+              child: Center(
+                child: StatusChip(label: '助手不可用', tone: ChipTone.danger),
+              ),
+            ),
+        ],
+      ),
+      body: _loading && _messages.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                if (_error != null) _errorBanner(_error!),
+                Expanded(child: _buildMessageList()),
+                _buildInputBar(canChat),
+              ],
+            ),
     );
   }
 
@@ -484,14 +658,18 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
       color: theme.colorScheme.errorContainer,
       child: Row(
         children: [
-          Icon(Icons.error_outline,
-              size: 16, color: theme.colorScheme.onErrorContainer),
+          Icon(
+            Icons.error_outline,
+            size: 16,
+            color: theme.colorScheme.onErrorContainer,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               message,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.onErrorContainer),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onErrorContainer,
+              ),
             ),
           ),
           IconButton(
@@ -508,21 +686,58 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
   Widget _buildMessageList() {
     if (_messages.isEmpty) {
       final theme = Theme.of(context);
+      final canChat = _status?.canChat ?? false;
       return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.auto_awesome, size: 44, color: theme.colorScheme.outline),
+              Icon(
+                Icons.auto_awesome,
+                size: 44,
+                color: theme.colorScheme.outline,
+              ),
               const SizedBox(height: 12),
-              Text('向 Copilot 提问你的账本', style: theme.textTheme.titleMedium),
+              Text(
+                '你好，我可以帮你查询支出、收入、余额等账本信息。',
+                style: theme.textTheme.titleMedium,
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 8),
               Text(
-                '例如：最近有哪些大额消费？',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.outline),
+                'Copilot 只读查询账本，不会改账。',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.outline,
+                ),
+                textAlign: TextAlign.center,
               ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: [
+                  for (final question in kExampleQuestions)
+                    ActionChip(
+                      label: Text(question),
+                      // 助手不可用时禁用示例问题
+                      onPressed: canChat
+                          ? () => _send(retryText: question)
+                          : null,
+                    ),
+                ],
+              ),
+              if (!canChat) ...[
+                const SizedBox(height: 12),
+                Text(
+                  '向 Copilot 提问你的账本',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.outline,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ],
           ),
         ),
@@ -559,8 +774,9 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
         ),
         child: SelectableText(
           message.content,
-          style: theme.textTheme.bodyMedium
-              ?.copyWith(color: theme.colorScheme.onPrimaryContainer),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onPrimaryContainer,
+          ),
         ),
       ),
     );
@@ -594,8 +810,9 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
                     ),
                     Text(
                       hasThinking ? '思考过程' : '正在思考…',
-                      style: theme.textTheme.labelMedium
-                          ?.copyWith(color: theme.colorScheme.outline),
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.outline,
+                      ),
                     ),
                     if (statusText != null) ...[
                       const SizedBox(width: 8),
@@ -720,7 +937,9 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
                 ? Icons.thumb_up
                 : Icons.thumb_up_outlined,
             size: 18,
-            color: message.feedback == 'like' ? theme.colorScheme.primary : null,
+            color: message.feedback == 'like'
+                ? theme.colorScheme.primary
+                : null,
           ),
         ),
         IconButton(
@@ -734,8 +953,9 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
                 ? Icons.thumb_down
                 : Icons.thumb_down_outlined,
             size: 18,
-            color:
-                message.feedback == 'dislike' ? theme.colorScheme.error : null,
+            color: message.feedback == 'dislike'
+                ? theme.colorScheme.error
+                : null,
           ),
         ),
       ],
@@ -765,8 +985,9 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
                   _status!.apiKeyConfigured
                       ? '账本文件不存在，助手暂时不可用'
                       : '尚未配置大模型 API Key，助手暂时不可用',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.colorScheme.error),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
                 ),
               ),
             Row(
@@ -783,8 +1004,10 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
                       hintText: '输入问题…',
                       isDense: true,
                       border: OutlineInputBorder(),
-                      contentPadding:
-                          EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
                     ),
                   ),
                 ),
@@ -820,8 +1043,9 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
                       const Spacer(),
                       Text(
                         _status!.assistantModel,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: theme.colorScheme.outline),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.outline,
+                        ),
                       ),
                     ],
                   ],
@@ -832,8 +1056,9 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
                 padding: const EdgeInsets.only(top: 2),
                 child: Text(
                   '账本参考日期：${FormatUtil.date(_status!.referenceDate)}',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.colorScheme.outline),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.outline,
+                  ),
                 ),
               ),
           ],

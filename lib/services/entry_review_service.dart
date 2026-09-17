@@ -15,8 +15,9 @@ class EntryReviewService {
 
   /// `GET /translate/entry-review/results`（跨账单扁平条目列表）。
   Future<EntryReviewResults> results() async {
-    final response =
-        await _client.get<Object?>('/translate/entry-review/results');
+    final response = await _client.get<Object?>(
+      '/translate/entry-review/results',
+    );
     final data = response.data;
     return data is Map
         ? EntryReviewResults.fromJson(data.cast<String, Object?>())
@@ -35,15 +36,5 @@ class EntryReviewService {
         .whereType<Map>()
         .map((e) => ScheduledTask.fromJson(e.cast<String, Object?>()))
         .toList();
-  }
-
-  /// 待审核条目总数（汇总所有 entry_review 待办的 `entry_count`）。
-  Future<int> pendingCount() async {
-    final tasks = await pendingTasks();
-    var total = 0;
-    for (final task in tasks) {
-      total += task.entryCount ?? 0;
-    }
-    return total;
   }
 }

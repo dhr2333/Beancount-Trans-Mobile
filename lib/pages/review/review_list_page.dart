@@ -55,7 +55,7 @@ class _ReviewListPageState extends State<ReviewListPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('解析审核待办'),
+        title: const Text('解析审核'),
         actions: [
           IconButton(
             tooltip: '刷新',
@@ -140,14 +140,18 @@ class _SummaryCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.rule_folder_outlined, color: theme.colorScheme.primary),
+                Icon(
+                  Icons.rule_folder_outlined,
+                  color: theme.colorScheme.primary,
+                ),
                 const SizedBox(width: 10),
                 Text('待审核条目', style: theme.textTheme.titleSmall),
                 const Spacer(),
                 Text(
                   '${data.entryCount}',
-                  style: theme.textTheme.headlineSmall
-                      ?.copyWith(color: theme.colorScheme.primary),
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                  ),
                 ),
               ],
             ),
@@ -157,16 +161,12 @@ class _SummaryCard extends StatelessWidget {
               runSpacing: 6,
               children: [
                 StatusChip(
-                  label: expired
-                      ? '审核已过期'
-                      : FormatUtil.countdown(expiresAt),
+                  label: expired ? '审核已过期' : FormatUtil.countdown(expiresAt),
                   tone: expired ? ChipTone.danger : ChipTone.info,
                   icon: Icons.timer_outlined,
                 ),
                 if (expiresAt != null)
-                  StatusChip(
-                    label: '截止 ${FormatUtil.unixDateTime(expiresAt)}',
-                  ),
+                  StatusChip(label: '截止 ${FormatUtil.unixDateTime(expiresAt)}'),
               ],
             ),
           ],
@@ -189,21 +189,27 @@ class _GroupHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 2),
       child: Row(
         children: [
-          Icon(Icons.description_outlined, size: 16, color: theme.colorScheme.outline),
+          Icon(
+            Icons.description_outlined,
+            size: 16,
+            color: theme.colorScheme.outline,
+          ),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
               fileName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelLarge
-                  ?.copyWith(color: theme.colorScheme.outline),
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.outline,
+              ),
             ),
           ),
           Text(
             '$count 条',
-            style: theme.textTheme.labelMedium
-                ?.copyWith(color: theme.colorScheme.outline),
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.outline,
+            ),
           ),
         ],
       ),
@@ -251,8 +257,9 @@ class _EntryCard extends StatelessWidget {
                         Text(
                           '${FormatUtil.date(row?.transactionTime)} · '
                           '${row == null || row.transactionType.trim().isEmpty ? FormatUtil.placeholder : row.transactionType}',
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(color: theme.colorScheme.outline),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.outline,
+                          ),
                         ),
                       ],
                     ),
@@ -322,13 +329,17 @@ class _ErrorView extends StatelessWidget {
           child: Text(
             message,
             textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: theme.colorScheme.outline),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.outline,
+            ),
           ),
         ),
         const SizedBox(height: 16),
         Center(
-          child: FilledButton.tonal(onPressed: onRetry, child: const Text('重试')),
+          child: FilledButton.tonal(
+            onPressed: onRetry,
+            child: const Text('重试'),
+          ),
         ),
       ],
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'pages/home_shell.dart';
+import 'core/route_observer.dart';
+import 'pages/assistant/assistant_chat_page.dart';
 import 'pages/login_page.dart';
 import 'pages/splash_page.dart';
 import 'state/auth_store.dart';
@@ -19,11 +20,12 @@ class BeancountTransApp extends StatelessWidget {
         colorSchemeSeed: const Color(0xFF2F6FED),
       ),
       home: const AuthGate(),
+      navigatorObservers: [routeObserver],
     );
   }
 }
 
-/// 认证门：启动中 → 启动页；未登录 → 登录页；已登录 → 主壳。
+/// 认证门：启动中 → 启动页；未登录 → 登录页；已登录 → Copilot 对话页。
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
@@ -38,7 +40,7 @@ class AuthGate extends StatelessWidget {
           case AuthStatus.loggedOut:
             return const LoginPage();
           case AuthStatus.loggedIn:
-            return const HomeShell();
+            return const AssistantChatPage();
         }
       },
     );

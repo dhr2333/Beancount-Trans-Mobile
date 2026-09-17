@@ -45,7 +45,10 @@ class ReconciliationService {
   }
 
   /// 仅允许修改 `scheduled_date`。
-  Future<ScheduledTask> updateScheduledDate(int id, String scheduledDate) async {
+  Future<ScheduledTask> updateScheduledDate(
+    int id,
+    String scheduledDate,
+  ) async {
     final response = await _client.patch<Object?>(
       '/reconciliation/tasks/$id/',
       data: {'scheduled_date': scheduledDate},
@@ -58,8 +61,9 @@ class ReconciliationService {
 
   /// 开始对账：拿到预期余额与默认分配账户。
   Future<ReconciliationStart> start(int id) async {
-    final response =
-        await _client.post<Object?>('/reconciliation/tasks/$id/start/');
+    final response = await _client.post<Object?>(
+      '/reconciliation/tasks/$id/start/',
+    );
     final data = response.data;
     return ReconciliationStart.fromJson(
       data is Map ? data.cast<String, Object?>() : const {},
@@ -86,13 +90,6 @@ class ReconciliationService {
     final data = response.data;
     return ReconciliationExecuteResult.fromJson(
       data is Map ? data.cast<String, Object?>() : const {},
-    );
-  }
-
-  /// 撤销对账（仅 `completed` 状态可用）。
-  Future<void> revoke(int id) async {
-    await _client.post<Object?>(
-      '/reconciliation/tasks/$id/revoke_reconciliation/',
     );
   }
 
