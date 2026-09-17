@@ -10,7 +10,7 @@
 #   FLUTTER_VERSION      Flutter 固定版本（默认 3.47.4）
 #   FLUTTER_MIRROR       Flutter 下载镜像（默认 https://storage.flutter-io.cn）
 #   PUB_HOSTED_URL       pub 镜像（默认 https://pub.flutter-io.cn）
-#   MOBILE_JAVA_HOME     可选，显式指定 JDK 17 路径
+#   MOBILE_JAVA_HOME     可选，显式指定 JDK 路径（需 ≥17）
 #   CMDLINE_TOOLS_ZIP    可选，本地已有的 commandlinetools zip（跳过下载）
 #   ANDROID_PLATFORM     Android 编译 SDK（默认 android-36）
 #   ANDROID_BUILD_TOOLS  Android build-tools（默认 36.0.0）
@@ -43,26 +43,43 @@ log "Flutter $FLUTTER_VERSION（镜像 $FLUTTER_MIRROR）/ Android $ANDROID_PLAT
 mkdir -p "$TOOLCHAIN_ROOT" "$PUB_CACHE_DIR" "$GRADLE_HOME_DIR"
 
 # -----------------------------------------------------------------------------
-# 1. 解析 JDK 17（缺失则快速失败，避免进入后续业务阶段）
+# 1. 解析 JDK（≥17 即可；优先复用环境里已有的 JDK，缺失则快速失败）
 # -----------------------------------------------------------------------------
-log "[1/5] 解析 JDK 17 ..."
+log "[1/5] 解析 JDK（最低 17）..."
+MIN_JDK_MAJOR=17
+
+# 输出 javac 主版本号（如 17、21、25），识别失败输出空串
+javac_major_version() {
+  "$1" -version 2>&1 | awk '
+    /^javac 1\./ { split($2, a, "."); print a[2]; exit }
+    /^javac [0-9]+\./ { split($2, a, "."); print a[1]; exit }
+  '
+}
 
 resolve_java_home() {
-  local candidates=() candidate derived java_bin
+  local candidates=() candidate globbed derived java_bin major
   [ -n "$MOBILE_JAVA_HOME" ] && candidates+=("$MOBILE_JAVA_HOME")
+  # 优先固定的 JDK 17 路径，保证「有 17 就用 17」
   candidates+=("/usr/lib/jvm/java-17-openjdk" "/usr/lib/jvm/java-17-openjdk-amd64")
-  # 由 PATH 中的 java 真实路径反推 JAVA_HOME（.../bin/java -> ...）
+  # 由 PATH 中的 java 真实路径反推 JAVA_HOME（.../bin/java -> ...）：复用环境自带 JDK
   if java_bin="$(command -v java 2>/dev/null)"; then
     derived="$(readlink -f "$java_bin" 2>/dev/null || true)"
     if [ -n "$derived" ]; then
       candidates+=("$(dirname "$(dirname "$derived")")")
     fi
   fi
+  # 常见发行版 / 镜像布局（含 eclipse-temurin 的 /opt/java/openjdk、Jenkins 官方镜像等）
+  for globbed in /opt/java/*/bin/javac /usr/lib/jvm/*/bin/javac /opt/*jdk*/bin/javac \
+    /usr/local/openjdk*/bin/javac /usr/java/*/bin/javac "$HOME"/.sdkman/candidates/java/*/bin/javac; do
+    [ -x "$globbed" ] || continue
+    candidates+=("$(dirname "$(dirname "$globbed")")")
+  done
   for candidate in "${candidates[@]}"; do
     [ -n "$candidate" ] || continue
     [ -x "$candidate/bin/javac" ] || continue
-    # 只认 JDK 17：javac -version 输出形如 "javac 17.0.x"
-    if "$candidate/bin/javac" -version 2>&1 | grep -q '^javac 17\.'; then
+    major="$(javac_major_version "$candidate/bin/javac")"
+    [ -n "$major" ] || continue
+    if [ "$major" -ge "$MIN_JDK_MAJOR" ]; then
       echo "$candidate"
       return 0
     fi
@@ -71,7 +88,7 @@ resolve_java_home() {
 }
 
 if ! JAVA_HOME="$(resolve_java_home)"; then
-  die "未找到 JDK 17。请安装 JDK 17（如 /usr/lib/jvm/java-17-openjdk），或用 MOBILE_JAVA_HOME=/path/to/jdk17 显式指定。"
+  die "未找到 JDK $MIN_JDK_MAJOR+。请安装 JDK（如 /usr/lib/jvm/java-17-openjdk），或用 MOBILE_JAVA_HOME=/path/to/jdk 显式指定。"
 fi
 export JAVA_HOME
 export PATH="$JAVA_HOME/bin:$PATH"
@@ -111,7 +128,7 @@ if [ "$need_flutter_install" = "1" ]; then
   fi
   log "      解压到 $TOOLCHAIN_ROOT（归档内含 flutter/ 顶层目录）"
   if ! tar -xf "$FLUTTER_ARCHIVE_FILE" -C "$TOOLCHAIN_ROOT"; then
-    die "Flutter SDK 解压失败：$FLUTTER_ARCHIVE_FILE"
+    die "Flutter SDK 解压失败：$FLUTTER_ARCHIVE_FILE（Flutter 仅提供 .tar.xz，需要 xz 支持；若本机缺少 xz，可先在能解压的机器上把归档解到 $FLUTTER_ROOT 后重跑本脚本）"
   fi
   rm -f "$FLUTTER_ARCHIVE_FILE"
   [ -x "$FLUTTER_BIN" ] || die "Flutter SDK 安装异常，未找到可执行文件：$FLUTTER_BIN"
@@ -177,8 +194,10 @@ if [ -x "$ANDROID_HOME/platform-tools/adb" ] \
   log "      platform-tools / platforms;$ANDROID_PLATFORM / build-tools;$ANDROID_BUILD_TOOLS 已安装，跳过"
 else
   log "      安装 platform-tools、platforms;$ANDROID_PLATFORM、build-tools;$ANDROID_BUILD_TOOLS ..."
+  # 新版 sdkmanager 会转发给 Android CLI，并以交互方式要求确认服务条款/条款；
+  # 用进程替换持续喂 'y'（不参与管道状态，避免 pipefail 误判），保证非交互环境下不挂起
   if ! "$SDKMANAGER" --sdk_root="$ANDROID_HOME" \
-    "platform-tools" "platforms;$ANDROID_PLATFORM" "build-tools;$ANDROID_BUILD_TOOLS"; then
+    "platform-tools" "platforms;$ANDROID_PLATFORM" "build-tools;$ANDROID_BUILD_TOOLS" < <(yes); then
     die "Android SDK 组件安装失败（platform-tools / platforms;$ANDROID_PLATFORM / build-tools;$ANDROID_BUILD_TOOLS）"
   fi
 fi
