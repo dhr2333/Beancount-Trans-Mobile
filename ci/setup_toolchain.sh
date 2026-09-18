@@ -14,6 +14,8 @@
 #   CMDLINE_TOOLS_ZIP    可选，本地已有的 commandlinetools zip（跳过下载）
 #   ANDROID_PLATFORM     Android 编译 SDK（默认 android-36）
 #   ANDROID_BUILD_TOOLS  Android build-tools（默认 36.0.0）
+#   ANDROID_NDK_VERSION  Android NDK（默认 28.2.13676358，须与 Flutter SDK 的
+#                        FlutterExtension.ndkVersion 保持一致）
 # =============================================================================
 set -euo pipefail
 
@@ -25,6 +27,7 @@ MOBILE_JAVA_HOME="${MOBILE_JAVA_HOME:-}"
 CMDLINE_TOOLS_ZIP="${CMDLINE_TOOLS_ZIP:-}"
 ANDROID_PLATFORM="${ANDROID_PLATFORM:-android-36}"
 ANDROID_BUILD_TOOLS="${ANDROID_BUILD_TOOLS:-36.0.0}"
+ANDROID_NDK_VERSION="${ANDROID_NDK_VERSION:-28.2.13676358}"
 
 # 共享目录布局（全部位于 TOOLCHAIN_ROOT 下，仓库内不落任何工具链文件）
 FLUTTER_ROOT="$TOOLCHAIN_ROOT/flutter"
@@ -36,6 +39,16 @@ GRADLE_HOME_DIR="$TOOLCHAIN_ROOT/gradle-home"
 
 log() { echo "[setup] $*"; }
 die() { echo "!! $*" >&2; exit 1; }
+
+case ",${no_proxy:-}," in
+  *",dl.google.com,"*) ;;
+  *) no_proxy="${no_proxy:+$no_proxy,}dl.google.com" ;;
+esac
+case ",${NO_PROXY:-}," in
+  *",dl.google.com,"*) ;;
+  *) NO_PROXY="${NO_PROXY:+$NO_PROXY,}dl.google.com" ;;
+esac
+export no_proxy NO_PROXY
 
 log "工具链根目录：$TOOLCHAIN_ROOT"
 log "Flutter $FLUTTER_VERSION（镜像 $FLUTTER_MIRROR）/ Android $ANDROID_PLATFORM + build-tools $ANDROID_BUILD_TOOLS"
@@ -190,15 +203,17 @@ yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/dev/null || true
 # 3.4 安装所需组件：已全部安装时跳过，避免每次构建都联网校验
 if [ -x "$ANDROID_HOME/platform-tools/adb" ] \
   && [ -f "$ANDROID_HOME/platforms/$ANDROID_PLATFORM/sdk.properties" ] \
-  && [ -f "$ANDROID_HOME/build-tools/$ANDROID_BUILD_TOOLS/source.properties" ]; then
-  log "      platform-tools / platforms;$ANDROID_PLATFORM / build-tools;$ANDROID_BUILD_TOOLS 已安装，跳过"
+  && [ -f "$ANDROID_HOME/build-tools/$ANDROID_BUILD_TOOLS/source.properties" ] \
+  && [ -f "$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION/source.properties" ]; then
+  log "      platform-tools / platforms;$ANDROID_PLATFORM / build-tools;$ANDROID_BUILD_TOOLS / ndk;$ANDROID_NDK_VERSION 已安装，跳过"
 else
-  log "      安装 platform-tools、platforms;$ANDROID_PLATFORM、build-tools;$ANDROID_BUILD_TOOLS ..."
+  log "      安装 platform-tools、platforms;$ANDROID_PLATFORM、build-tools;$ANDROID_BUILD_TOOLS、ndk;$ANDROID_NDK_VERSION ..."
   # 新版 sdkmanager 会转发给 Android CLI，并以交互方式要求确认服务条款/条款；
   # 用进程替换持续喂 'y'（不参与管道状态，避免 pipefail 误判），保证非交互环境下不挂起
   if ! "$SDKMANAGER" --sdk_root="$ANDROID_HOME" \
-    "platform-tools" "platforms;$ANDROID_PLATFORM" "build-tools;$ANDROID_BUILD_TOOLS" < <(yes); then
-    die "Android SDK 组件安装失败（platform-tools / platforms;$ANDROID_PLATFORM / build-tools;$ANDROID_BUILD_TOOLS）"
+    "platform-tools" "platforms;$ANDROID_PLATFORM" "build-tools;$ANDROID_BUILD_TOOLS" \
+    "ndk;$ANDROID_NDK_VERSION" < <(yes); then
+    die "Android SDK 组件安装失败（platform-tools / platforms;$ANDROID_PLATFORM / build-tools;$ANDROID_BUILD_TOOLS / ndk;$ANDROID_NDK_VERSION）"
   fi
 fi
 export PATH="$FLUTTER_ROOT/bin:$CMDLINE_TOOLS_DIR/bin:$ANDROID_HOME/platform-tools:$JAVA_HOME/bin:$PATH"
@@ -229,6 +244,8 @@ export PUB_CACHE="\$TOOLCHAIN_ROOT/pub-cache"
 export GRADLE_USER_HOME="\$TOOLCHAIN_ROOT/gradle-home"
 export PUB_HOSTED_URL="$PUB_HOSTED_URL"
 export FLUTTER_STORAGE_BASE_URL="$FLUTTER_MIRROR"
+export no_proxy="dl.google.com\${no_proxy:+,\$no_proxy}"
+export NO_PROXY="dl.google.com\${NO_PROXY:+,\$NO_PROXY}"
 export PATH="\$FLUTTER_ROOT/bin:\$ANDROID_HOME/cmdline-tools/latest/bin:\$ANDROID_HOME/platform-tools:\$JAVA_HOME/bin:\$PATH"
 EOF
 
