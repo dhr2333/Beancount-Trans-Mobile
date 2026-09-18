@@ -844,16 +844,10 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
                 color: theme.colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: SelectableText(
-                message.thinking,
-                style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
-              ),
+              child: _buildThinkingText(message),
             ),
           if (message.content.trim().isNotEmpty)
-            SelectableText(
-              message.content,
-              style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
-            )
+            _buildReplyText(message)
           else if (message.streaming)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 6),
@@ -880,6 +874,29 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
         ],
       ),
     );
+  }
+
+  /// 思考过程：流式期间按纯文本渲染，结束后按 Markdown 渲染（与 Web 端一致）。
+  Widget _buildThinkingText(ChatMessage message) {
+    final style = Theme.of(context).textTheme.bodySmall;
+    if (message.streaming) {
+      return SelectableText(
+        message.thinking,
+        style: style?.copyWith(height: 1.5),
+      );
+    }
+    return MarkdownContent(content: message.thinking, baseStyle: style);
+  }
+
+  /// Copilot 回复正文：流式期间按纯文本渲染，避免未闭合的 Markdown 语法抖动。
+  Widget _buildReplyText(ChatMessage message) {
+    if (message.streaming) {
+      return SelectableText(
+        message.content,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.5),
+      );
+    }
+    return MarkdownContent(content: message.content);
   }
 
   Widget _buildQueryCard(QueryRecord query) {
