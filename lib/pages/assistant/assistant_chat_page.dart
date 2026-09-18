@@ -7,6 +7,7 @@ import '../../core/sse_client.dart';
 import '../../models/assistant.dart';
 import '../../services/assistant_service.dart';
 import '../../services/todo_service.dart';
+import '../../widgets/markdown_content.dart';
 import '../../widgets/status_chip.dart';
 import '../fava_page.dart';
 import '../profile_page.dart';
@@ -183,7 +184,12 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
         break;
 
       case 'status':
-        _lastAssistantMessage()?.status = '${data['phase'] ?? ''}';
+        final assistant = _lastAssistantMessage();
+        if (assistant == null) break;
+        final phase = '${data['phase'] ?? ''}';
+        assistant.status = phase;
+        // 思考阶段结束（查询/撰写）后自动折叠思考内容
+        if (phase != 'thinking') assistant.thinkingExpanded = false;
         break;
 
       case 'reasoning_delta':
@@ -200,6 +206,8 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
         if (assistant == null) break;
         assistant.thinking = '${data['content'] ?? ''}';
         assistant.reasoning = '${data['reasoning'] ?? ''}';
+        // 该事件在思考已定型时下发，自动折叠
+        assistant.thinkingExpanded = false;
         break;
 
       case 'tool_end':
@@ -274,6 +282,7 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
           if (assistant.content.trim().isEmpty) assistant.content = detail;
           assistant.streaming = false;
           assistant.status = null;
+          assistant.thinkingExpanded = false;
         }
         _error = detail;
         break;
@@ -336,6 +345,7 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
         if (assistant != null && assistant.streaming) {
           assistant.streaming = false;
           assistant.status = null;
+          assistant.thinkingExpanded = false;
           if (assistant.content.trim().isEmpty) {
             assistant.content = '未收到完整回复，请重试';
             _error = assistant.content;
@@ -349,6 +359,7 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
         if (assistant != null && assistant.streaming) {
           assistant.streaming = false;
           assistant.status = null;
+          assistant.thinkingExpanded = false;
           if (assistant.content.trim().isEmpty) {
             assistant.content = error.code == SseClient.codeCancelled
                 ? kInterruptedReply
@@ -394,6 +405,7 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
         if (assistant != null) {
           assistant.streaming = false;
           assistant.status = null;
+          assistant.thinkingExpanded = false;
         }
         _error = error.message;
       });
@@ -416,6 +428,7 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
       if (assistant != null && assistant.streaming) {
         assistant.streaming = false;
         assistant.status = null;
+        assistant.thinkingExpanded = false;
         if (assistant.content.trim().isEmpty) {
           assistant.content = kInterruptedReply;
         }
