@@ -211,6 +211,7 @@ class ChatMessage {
     this.status,
     this.feedback,
     this.feedbackSubmitting = false,
+    this.localNotice = false,
   }) : queries = queries ?? [];
 
   String id;
@@ -226,6 +227,9 @@ class ChatMessage {
   String? status;
   String? feedback;
   bool feedbackSubmitting;
+
+  /// 纯客户端提示（如上传解析结果）：不落服务端，也不参与点赞点踩。
+  final bool localNotice;
 
   bool get isUser => role == 'user';
 

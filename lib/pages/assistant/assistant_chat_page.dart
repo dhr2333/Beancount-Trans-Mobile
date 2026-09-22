@@ -1,12 +1,14 @@
 import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/api_exception.dart';
-import '../../core/format.dart';
 import '../../core/sse_client.dart';
 import '../../models/assistant.dart';
+import '../../models/parse_review.dart';
 import '../../services/assistant_service.dart';
 import '../../services/todo_service.dart';
+import '../../services/translate_service.dart';
 import '../../widgets/markdown_content.dart';
 import '../../widgets/status_chip.dart';
 import '../fava_page.dart';
@@ -53,6 +55,9 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
   bool _loading = true;
   bool _sending = false;
   bool _deepThink = false;
+
+  /// 账单上传解析中（上传/解析期间禁用附件按钮）。
+  bool _uploading = false;
 
   // ------------------------------------------------------------ 抽屉数据
   List<ChatSessionSummary> _sessions = const [];
@@ -474,6 +479,76 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
     );
   }
 
+  // ------------------------------------------------------------ 上传账单解析
+
+  /// 选取账单文件上传解析：文件不入文件管理，解析结果并入解析审核待办。
+  Future<void> _pickAndUploadBill() async {
+    if (_uploading) return;
+
+    final List<PlatformFile> picked;
+    try {
+      picked = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['csv', 'pdf', 'xls', 'xlsx', 'zip'],
+      );
+    } catch (_) {
+      _notify('打开文件选择器失败');
+      return;
+    }
+    if (picked.isEmpty || !mounted) return;
+
+    final file = picked.first;
+    setState(() => _uploading = true);
+    try {
+      final bytes = await file.readAsBytes();
+      final result = await TranslateService.instance.uploadBillParse(
+        filename: file.name,
+        bytes: bytes,
+      );
+      if (!mounted) return;
+      _appendNotice(_uploadResultText(result, file.name));
+      // 上传解析会生成/刷新解析审核待办，同步刷新抽屉徽标
+      await _refreshDrawerData();
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      _appendNotice('账单「${file.name}」解析失败：${error.message}');
+      _notify(error.message);
+    } catch (_) {
+      if (!mounted) return;
+      _appendNotice('账单「${file.name}」读取或上传失败，请重试');
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  /// 上传解析结果文案。
+  String _uploadResultText(UploadParseResult result, String fileName) {
+    final name = result.fileName.trim().isNotEmpty ? result.fileName : fileName;
+    if (!result.hasEntries) {
+      return '「$name」没有新增待审条目：${result.duplicateCount} 条已存在'
+          '（当前待审 ${result.pendingTotal} 条）。';
+    }
+    final skipped = result.duplicateCount > 0
+        ? '（跳过 ${result.duplicateCount} 条重复）'
+        : '';
+    return '已上传并解析「$name」：新增 ${result.entryCount} 条待审条目$skipped，'
+        '可在「待办 → 解析审核」中查看。';
+  }
+
+  /// 追加一条本地提示消息（纯客户端，不落服务端）。
+  void _appendNotice(String content) {
+    setState(() {
+      _messages.add(
+        ChatMessage(
+          id: _newId(),
+          role: 'assistant',
+          content: content,
+          localNotice: true,
+        ),
+      );
+    });
+  }
+
   // ---------------------------------------------------------------- 抽屉
 
   /// 关闭抽屉（未打开时为空操作）。
@@ -869,7 +944,8 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
             ),
           if (!message.streaming &&
               message.content.trim().isNotEmpty &&
-              !message.isInterrupted)
+              !message.isInterrupted &&
+              !message.localNotice)
             _buildFeedbackRow(message),
         ],
       ),
@@ -1023,6 +1099,21 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                if (_uploading)
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(6, 0, 10, 12),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                else
+                  IconButton(
+                    tooltip: '上传账单解析',
+                    onPressed: _pickAndUploadBill,
+                    icon: const Icon(Icons.attach_file),
+                  ),
                 Expanded(
                   child: TextField(
                     controller: _input,
@@ -1069,26 +1160,7 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
                     ),
                     const SizedBox(width: 4),
                     Text('深度思考', style: theme.textTheme.bodySmall),
-                    if (_status?.assistantModel.isNotEmpty == true) ...[
-                      const Spacer(),
-                      Text(
-                        _status!.assistantModel,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.outline,
-                        ),
-                      ),
-                    ],
                   ],
-                ),
-              ),
-            if (_status?.referenceDate.isNotEmpty == true)
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Text(
-                  '账本参考日期：${FormatUtil.date(_status!.referenceDate)}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.outline,
-                  ),
                 ),
               ),
           ],

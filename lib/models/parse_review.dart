@@ -211,6 +211,51 @@ class FormattedEntry {
   bool get isInstallmentPurchase => installmentRole == 'purchase';
 }
 
+/// `POST /translate/upload-parse`（上传账单直接解析）的响应。
+class UploadParseResult {
+  const UploadParseResult({
+    this.fileName = '',
+    this.entryCount = 0,
+    this.duplicateCount = 0,
+    this.pendingTotal = 0,
+    this.entryReviewTaskId,
+  });
+
+  final String fileName;
+
+  /// 本次新增的待审核条目数。
+  final int entryCount;
+
+  /// 被判为重复而跳过的条目数。
+  final int duplicateCount;
+
+  /// 当前待审核条目总数。
+  final int pendingTotal;
+
+  /// 用户级条目审核待办 ID。
+  final int? entryReviewTaskId;
+
+  bool get hasEntries => entryCount > 0;
+
+  factory UploadParseResult.fromJson(Map<String, Object?> json) {
+    return UploadParseResult(
+      fileName: '${json['file_name'] ?? ''}',
+      entryCount: _asInt(json['entry_count']),
+      duplicateCount: _asInt(json['duplicate_count']),
+      pendingTotal: _asInt(json['pending_total']),
+      entryReviewTaskId: json['entry_review_task_id'] == null
+          ? null
+          : _asInt(json['entry_review_task_id']),
+    );
+  }
+
+  static int _asInt(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse('${value ?? ''}') ?? 0;
+  }
+}
+
 /// `GET /translate/entry-review/results` 的响应。
 class EntryReviewResults {
   const EntryReviewResults({

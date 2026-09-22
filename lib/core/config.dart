@@ -18,6 +18,9 @@ class ApiConfig {
   /// 普通请求超时。
   static const Duration requestTimeout = Duration(seconds: 30);
 
+  /// 账单上传解析超时：后端同步解析，耗时可能明显长于普通请求。
+  static const Duration uploadParseTimeout = Duration(minutes: 3);
+
   /// SSE 空闲超时：超过该时长未收到任何帧则中止请求。
   static const Duration sseIdleTimeout = Duration(seconds: 90);
 }
