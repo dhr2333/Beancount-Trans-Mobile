@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../core/api_client.dart';
+import '../core/jwt.dart';
 import '../core/token_store.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
@@ -11,7 +12,7 @@ enum AuthStatus { unknown, loggedOut, loggedIn }
 /// 认证状态：登录态、用户信息、公共配置。
 class AuthStore extends ChangeNotifier {
   AuthStore._() {
-    // access/refresh 均失效时退回登录页
+    // refresh 确认失效时退回登录页
     ApiClient.instance.onSessionExpired = _handleSessionExpired;
   }
 
@@ -23,6 +24,7 @@ class AuthStore extends ChangeNotifier {
   UserBindings? _bindings;
   bool _busy = false;
   bool _configLoaded = false;
+  bool _sessionExpired = false;
 
   AuthStatus get status => _status;
   AppUser? get user => _user;
@@ -30,27 +32,45 @@ class AuthStore extends ChangeNotifier {
   UserBindings? get bindings => _bindings;
   bool get isBusy => _busy;
 
+  /// 是否因登录态失效而退回登录页（用于登录页提示）。
+  bool get sessionExpired => _sessionExpired;
+
   /// 公共配置是否已成功拉取过。
   bool get configLoaded => _configLoaded;
   bool get isLoggedIn => _status == AuthStatus.loggedIn;
 
   /// 启动时恢复登录态。
+  ///
+  /// access 缺失或临近过期时先静默续期：续期只因网络等临时原因失败时**保留**本地登录态，
+  /// 只有 refresh 被后端明确拒绝才清空并退回登录页。
   Future<void> restore() async {
-    await TokenStore.instance.init();
-    final access = await TokenStore.instance.readAccess();
-    final refresh = await TokenStore.instance.readRefresh();
-    final hasToken = (access != null && access.isNotEmpty) ||
-        (refresh != null && refresh.isNotEmpty);
+    final store = TokenStore.instance;
+    await store.init();
 
-    if (!hasToken) {
+    if (!store.hasSession) {
       _status = AuthStatus.loggedOut;
       notifyListeners();
       return;
     }
 
-    final rawUser = await TokenStore.instance.readUser();
+    final access = store.accessToken;
+    if (access == null || access.isEmpty || isJwtExpiringSoon(access)) {
+      final result = await ApiClient.instance.refreshAccessToken();
+      if (result == RefreshResult.invalid) {
+        await store.clear();
+        _user = null;
+        _bindings = null;
+        _sessionExpired = true;
+        _status = AuthStatus.loggedOut;
+        notifyListeners();
+        return;
+      }
+      // success / transient：都保持已登录（transient 时后续请求会再次尝试）
+    }
+
+    final rawUser = await store.readUser();
     _user = rawUser == null ? null : AppUser.fromJson(rawUser);
-    _bindings = _readCachedBindings(await TokenStore.instance.readBindings());
+    _bindings = _readCachedBindings(await store.readBindings());
     _status = AuthStatus.loggedIn;
     notifyListeners();
   }
@@ -129,6 +149,7 @@ class AuthStore extends ChangeNotifier {
     await TokenStore.instance.clear();
     _user = null;
     _bindings = null;
+    _sessionExpired = false;
     _status = AuthStatus.loggedOut;
     notifyListeners();
   }
@@ -140,6 +161,7 @@ class AuthStore extends ChangeNotifier {
     );
     await TokenStore.instance.saveUser(result.user.toJson());
     _user = result.user;
+    _sessionExpired = false;
     _status = AuthStatus.loggedIn;
     notifyListeners();
   }
@@ -149,6 +171,7 @@ class AuthStore extends ChangeNotifier {
     TokenStore.instance.clear();
     _user = null;
     _bindings = null;
+    _sessionExpired = true;
     _status = AuthStatus.loggedOut;
     notifyListeners();
   }

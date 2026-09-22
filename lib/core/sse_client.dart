@@ -84,12 +84,18 @@ class SseClient {
         final status = error.response?.statusCode;
         // 401：刷新一次 access 后重试；仅重试一次。
         if (status == 401 && attempt == 1) {
-          final refreshed = await ApiClient.instance.refreshAccessToken();
-          if (refreshed) continue;
-          throw ApiException(
-            statusCode: 401,
-            message: '登录已过期，请重新登录',
-          );
+          final result = await ApiClient.instance.refreshAccessToken();
+          if (result == RefreshResult.success) continue;
+          if (result == RefreshResult.invalid) {
+            // refresh 确实失效：清空登录态并退回登录页
+            ApiClient.instance.onSessionExpired?.call();
+            throw ApiException(
+              statusCode: 401,
+              message: '登录已过期，请重新登录',
+            );
+          }
+          // 网络 / 服务端临时故障：保留登录态，只提示可重试
+          throw ApiException(message: '网络异常，请稍后重试');
         }
         if (error.type == DioExceptionType.cancel) {
           throw ApiException(code: codeCancelled, message: '请求已取消');

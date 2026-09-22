@@ -35,7 +35,9 @@ class _LoginPageState extends State<LoginPage> {
     super.initState();
     final store = AuthStore.instance;
     if (!store.configLoaded) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => store.loadPublicConfig());
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => store.loadPublicConfig(),
+      );
     }
   }
 
@@ -167,10 +169,9 @@ class _LoginPageState extends State<LoginPage> {
               child: Column(
                 children: [
                   _buildHeader(theme),
+                  if (store.sessionExpired) const _SessionExpiredBanner(),
                   TabBar(tabs: tabs),
-                  Expanded(
-                    child: TabBarView(children: views),
-                  ),
+                  Expanded(child: TabBarView(children: views)),
                 ],
               ),
             ),
@@ -195,8 +196,9 @@ class _LoginPageState extends State<LoginPage> {
           const SizedBox(height: 6),
           Text(
             '登录后查看审核待办与账本',
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: theme.colorScheme.outline),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.outline,
+            ),
           ),
         ],
       ),
@@ -241,8 +243,9 @@ class _LoginPageState extends State<LoginPage> {
             SizedBox(
               height: 56,
               child: OutlinedButton(
-                onPressed:
-                    (_countdown > 0 || _sendingCode || busy) ? null : _sendCode,
+                onPressed: (_countdown > 0 || _sendingCode || busy)
+                    ? null
+                    : _sendCode,
                 child: Text(_countdown > 0 ? '$_countdown s' : '获取验证码'),
               ),
             ),
@@ -257,8 +260,9 @@ class _LoginPageState extends State<LoginPage> {
         const SizedBox(height: 12),
         Text(
           '未注册的手机号将自动创建账号',
-          style: theme.textTheme.bodySmall
-              ?.copyWith(color: theme.colorScheme.outline),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.outline,
+          ),
         ),
       ],
     );
@@ -311,8 +315,9 @@ class _LoginPageState extends State<LoginPage> {
             alignment: Alignment.centerLeft,
             child: Text(
               _passwordError!,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.error),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
             ),
           ),
         ],
@@ -323,6 +328,44 @@ class _LoginPageState extends State<LoginPage> {
           onPressed: busy ? null : _loginByPassword,
         ),
       ],
+    );
+  }
+}
+
+/// 登录态失效退回登录页时的说明条。
+class _SessionExpiredBanner extends StatelessWidget {
+  const _SessionExpiredBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.secondaryContainer,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.info_outline,
+              size: 18,
+              color: theme.colorScheme.onSecondaryContainer,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '登录已过期，请重新登录',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSecondaryContainer,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
