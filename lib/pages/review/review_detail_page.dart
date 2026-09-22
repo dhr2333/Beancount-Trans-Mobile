@@ -285,7 +285,8 @@ class ReviewDetailPage extends StatelessWidget {
       children: [
         InfoRow(label: '条目 UUID', value: _orDash(entry.uuid), monospace: true),
         InfoRow(
-          label: '来源账单',
+          // Copilot 记账条目没有来源账单文件，来源即为「Copilot 记账」
+          label: entry.isCopilot ? '来源' : '来源账单',
           value: _orDash(entry.fileName),
         ),
         InfoRow(

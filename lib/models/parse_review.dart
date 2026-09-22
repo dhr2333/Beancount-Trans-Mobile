@@ -26,17 +26,17 @@ class OriginalRow {
   final String billIdentifier;
 
   factory OriginalRow.fromJson(Map<String, Object?> json) => OriginalRow(
-        transactionTime: '${json['transaction_time'] ?? ''}',
-        transactionCategory: '${json['transaction_category'] ?? ''}',
-        counterparty: '${json['counterparty'] ?? ''}',
-        commodity: '${json['commodity'] ?? ''}',
-        transactionType: '${json['transaction_type'] ?? ''}',
-        // 金额一律保留字符串形态，不做 double 解析
-        amount: json['amount'] == null ? '' : '${json['amount']}',
-        paymentMethod: '${json['payment_method'] ?? ''}',
-        transactionStatus: '${json['transaction_status'] ?? ''}',
-        billIdentifier: '${json['bill_identifier'] ?? ''}',
-      );
+    transactionTime: '${json['transaction_time'] ?? ''}',
+    transactionCategory: '${json['transaction_category'] ?? ''}',
+    counterparty: '${json['counterparty'] ?? ''}',
+    commodity: '${json['commodity'] ?? ''}',
+    transactionType: '${json['transaction_type'] ?? ''}',
+    // 金额一律保留字符串形态，不做 double 解析
+    amount: json['amount'] == null ? '' : '${json['amount']}',
+    paymentMethod: '${json['payment_method'] ?? ''}',
+    transactionStatus: '${json['transaction_status'] ?? ''}',
+    billIdentifier: '${json['bill_identifier'] ?? ''}',
+  );
 }
 
 /// 标签来源。
@@ -48,10 +48,10 @@ class TagSource {
   final String mappingType; // expense | income | asset
 
   factory TagSource.fromJson(Map<String, Object?> json) => TagSource(
-        type: '${json['type'] ?? ''}',
-        key: '${json['key'] ?? ''}',
-        mappingType: '${json['mapping_type'] ?? ''}',
-      );
+    type: '${json['type'] ?? ''}',
+    key: '${json['key'] ?? ''}',
+    mappingType: '${json['mapping_type'] ?? ''}',
+  );
 }
 
 /// 单个标签及其来源。
@@ -67,9 +67,9 @@ class TagDetail {
       path: '${json['path'] ?? ''}',
       sources: rawSources is List
           ? rawSources
-              .whereType<Map>()
-              .map((e) => TagSource.fromJson(e.cast<String, Object?>()))
-              .toList()
+                .whereType<Map>()
+                .map((e) => TagSource.fromJson(e.cast<String, Object?>()))
+                .toList()
           : const [],
     );
   }
@@ -77,7 +77,10 @@ class TagDetail {
 
 /// 人工增删的标签覆盖。
 class TagOverrides {
-  const TagOverrides({this.removedPaths = const [], this.addedPaths = const []});
+  const TagOverrides({
+    this.removedPaths = const [],
+    this.addedPaths = const [],
+  });
 
   final List<String> removedPaths;
   final List<String> addedPaths;
@@ -85,9 +88,9 @@ class TagOverrides {
   bool get isEmpty => removedPaths.isEmpty && addedPaths.isEmpty;
 
   factory TagOverrides.fromJson(Map<String, Object?> json) => TagOverrides(
-        removedPaths: _stringList(json['removed_paths']),
-        addedPaths: _stringList(json['added_paths']),
-      );
+    removedPaths: _stringList(json['removed_paths']),
+    addedPaths: _stringList(json['added_paths']),
+  );
 
   static List<String> _stringList(Object? value) {
     if (value is! List) return const [];
@@ -126,6 +129,7 @@ class FormattedEntry {
     this.installmentPeriod,
     this.fileId,
     this.fileName = '',
+    this.source = 'file',
   });
 
   final String uuid;
@@ -140,6 +144,13 @@ class FormattedEntry {
   final int? installmentPeriod;
   final int? fileId;
   final String fileName;
+
+  /// 条目来源：`file`（账单文件）| `copilot`（Copilot 记账）。
+  /// 历史数据缺少该字段时按 `file` 处理。
+  final String source;
+
+  /// 是否为 Copilot 自然语言记账条目（无账单文件，`file_id` 为 null）。
+  bool get isCopilot => source == 'copilot';
 
   /// 展示用 Beancount 文本：优先编辑后内容，为空回退原始内容。
   String get displayFormatted =>
@@ -168,30 +179,31 @@ class FormattedEntry {
       selectedExpenseKey: '${json['selected_expense_key'] ?? ''}',
       expenseCandidates: rawCandidates is List
           ? rawCandidates
-              .whereType<Map>()
-              .map((e) => ExpenseCandidate.fromJson(e.cast<String, Object?>()))
-              .toList()
+                .whereType<Map>()
+                .map(
+                  (e) => ExpenseCandidate.fromJson(e.cast<String, Object?>()),
+                )
+                .toList()
           : const [],
       originalRow: rawRow is Map
           ? OriginalRow.fromJson(rawRow.cast<String, Object?>())
           : null,
       tagDetails: rawTags is List
           ? rawTags
-              .whereType<Map>()
-              .map((e) => TagDetail.fromJson(e.cast<String, Object?>()))
-              .toList()
+                .whereType<Map>()
+                .map((e) => TagDetail.fromJson(e.cast<String, Object?>()))
+                .toList()
           : const [],
       tagOverrides: rawOverrides is Map
           ? TagOverrides.fromJson(rawOverrides.cast<String, Object?>())
           : null,
-      installmentRole:
-          rawRole is String && rawRole.isNotEmpty ? rawRole : null,
+      installmentRole: rawRole is String && rawRole.isNotEmpty ? rawRole : null,
       installmentPeriod: rawPeriod is int
           ? rawPeriod
           : (rawPeriod is num ? rawPeriod.toInt() : null),
-      fileId:
-          rawFileId is int ? rawFileId : int.tryParse('${rawFileId ?? ''}'),
+      fileId: rawFileId is int ? rawFileId : int.tryParse('${rawFileId ?? ''}'),
       fileName: '${json['file_name'] ?? ''}',
+      source: '${json['source'] ?? ''}' == 'copilot' ? 'copilot' : 'file',
     );
   }
 
@@ -220,26 +232,31 @@ class EntryReviewResults {
 
     final entries = rawEntries is List
         ? rawEntries
-            .whereType<Map>()
-            .map((e) => FormattedEntry.fromJson(e.cast<String, Object?>()))
-            .toList()
+              .whereType<Map>()
+              .map((e) => FormattedEntry.fromJson(e.cast<String, Object?>()))
+              .toList()
         : <FormattedEntry>[];
 
     return EntryReviewResults(
       entries: entries,
-      entryCount:
-          rawCount is int ? rawCount : (rawCount is num ? rawCount.toInt() : entries.length),
+      entryCount: rawCount is int
+          ? rawCount
+          : (rawCount is num ? rawCount.toInt() : entries.length),
       reviewExpiresAt: rawExpires is int
           ? rawExpires
           : (rawExpires is num ? rawExpires.toInt() : null),
     );
   }
 
-  /// 按来源账单文件名分组（未命名归入「未知账单」）。
+  /// 按来源分组：账单文件按文件名分组；Copilot 记账条目归入「Copilot 记账」
+  /// （未命名账单归入「未知账单」）。
   Map<String, List<FormattedEntry>> get groupedByFile {
     final grouped = <String, List<FormattedEntry>>{};
     for (final entry in entries) {
-      final key = entry.fileName.trim().isEmpty ? '未知账单' : entry.fileName;
+      final name = entry.fileName.trim();
+      final key = name.isNotEmpty
+          ? name
+          : (entry.isCopilot ? 'Copilot 记账' : '未知账单');
       grouped.putIfAbsent(key, () => []).add(entry);
     }
     return grouped;
