@@ -1220,7 +1220,6 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
                       if (deepThinkSupported)
                         FilterChip(
                           label: const Text('深度思考'),
-                          avatar: const Icon(Icons.lightbulb_outline, size: 16),
                           selected: _deepThink,
                           // 发送中禁用：onSelected 为空即为禁用态
                           onSelected: _sending

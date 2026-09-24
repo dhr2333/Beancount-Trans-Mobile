@@ -77,33 +77,64 @@ class AssistantDrawer extends StatelessWidget {
   }
 
   Widget _buildSearchField(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      child: TextField(
-        controller: searchController,
-        textInputAction: TextInputAction.search,
-        onSubmitted: (_) => onSearchSubmitted(),
-        decoration: InputDecoration(
-          hintText: '搜索会话',
-          isDense: true,
-          prefixIcon: const Icon(Icons.search, size: 20),
-          border: const OutlineInputBorder(),
-          // 无内部状态：用 ValueListenableBuilder 监听控制器决定清空按钮显隐
-          suffixIcon: ValueListenableBuilder<TextEditingValue>(
-            valueListenable: searchController,
-            builder: (context, value, _) {
-              if (value.text.isEmpty) return const SizedBox.shrink();
-              return IconButton(
-                tooltip: '清空',
-                iconSize: 18,
-                icon: const Icon(Icons.clear),
-                onPressed: () {
-                  searchController.clear();
-                  onSearchSubmitted();
-                },
-              );
-            },
-          ),
+      child: Container(
+        padding: const EdgeInsets.only(left: 12, right: 4),
+        decoration: BoxDecoration(
+          // 与底部胶囊输入框同一底色，避免抽屉里并存两种输入风格
+          color: theme.colorScheme.surfaceContainer,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.search,
+              size: 18,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: searchController,
+                style: theme.textTheme.bodyMedium,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (_) => onSearchSubmitted(),
+                decoration: InputDecoration(
+                  hintText: '搜索会话',
+                  // 默认 hintStyle 为 bodyLarge（16），显式降到与正文一致
+                  hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  isDense: true,
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+              ),
+            ),
+            // 无内部状态：用 ValueListenableBuilder 监听控制器决定清空按钮显隐
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: searchController,
+              builder: (context, value, _) {
+                if (value.text.isEmpty) return const SizedBox(width: 4);
+                return IconButton(
+                  tooltip: '清空',
+                  iconSize: 18,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 32,
+                    height: 32,
+                  ),
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    searchController.clear();
+                    onSearchSubmitted();
+                  },
+                );
+              },
+            ),
+          ],
         ),
       ),
     );
