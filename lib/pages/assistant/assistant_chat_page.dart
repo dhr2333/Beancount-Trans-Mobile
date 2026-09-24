@@ -1193,7 +1193,8 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
             Container(
               padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
+                // 比 surfaceContainerHighest 更浅，贴近页面底色、避免大块灰突兀
+                color: theme.colorScheme.surfaceContainer,
                 borderRadius: BorderRadius.circular(24),
               ),
               child: Column(
