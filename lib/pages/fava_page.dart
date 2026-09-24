@@ -41,8 +41,13 @@ class _FavaPageState extends State<FavaPage> {
     try {
       final prefix = await FavaService.instance.resolveFavaUrl();
       final relative = widget.relativePath ?? '';
-      final target =
-          relative.isEmpty ? prefix : FavaService.join(prefix, relative);
+      // 实例根路径必须带尾斜杠。访问 /{uuid}（无尾斜杠）时 Fava 容器内的 Werkzeug
+      // 会 308 到它自己拼的绝对地址；由于 TLS 在上游 Traefik 终止而容器不知情，
+      // 该地址是 http://…，Android WebView / iOS ATS 会以明文为由直接拦截
+      // （net::ERR_CLEARTEXT_NOT_PERMITTED）。桌面浏览器无此限制，故仅移动端复现。
+      final target = relative.isEmpty
+          ? '$prefix/'
+          : FavaService.join(prefix, relative);
       final uri = Uri.parse(target);
       _allowedHost = uri.host;
 
@@ -106,8 +111,9 @@ class _FavaPageState extends State<FavaPage> {
     if (isHttp && (_allowedHost == null || uri.host == _allowedHost)) {
       return NavigationDecision.navigate;
     }
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) => _notifyExternalBlocked(request.url));
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _notifyExternalBlocked(request.url),
+    );
     return NavigationDecision.prevent;
   }
 
@@ -186,14 +192,12 @@ class _FavaPageState extends State<FavaPage> {
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.outline),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.outline,
+                ),
               ),
               const SizedBox(height: 16),
-              FilledButton.tonal(
-                onPressed: _resolve,
-                child: const Text('重试'),
-              ),
+              FilledButton.tonal(onPressed: _resolve, child: const Text('重试')),
             ],
           ),
         ),
