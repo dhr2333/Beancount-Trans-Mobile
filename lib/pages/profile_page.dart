@@ -7,6 +7,7 @@ import '../core/api_exception.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 import '../state/auth_store.dart';
+import '../state/theme_store.dart';
 import 'fava_page.dart';
 
 /// 「我的」页：账号绑定信息、手机号绑定入口、Fava 报表入口、退出登录。
@@ -53,8 +54,14 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _openFava() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const FavaPage()),
+    await Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => const FavaPage()));
+  }
+
+  Future<void> _openThemeSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (_) => const _ThemeModeSheet(),
     );
   }
 
@@ -130,7 +137,9 @@ class _ProfilePageState extends State<ProfilePage> {
                     _InfoTile(
                       icon: Icons.person_outline,
                       label: '用户名',
-                      value: bindings.username.isEmpty ? '未设置' : bindings.username,
+                      value: bindings.username.isEmpty
+                          ? '未设置'
+                          : bindings.username,
                     ),
                     _InfoTile(
                       icon: Icons.mail_outline,
@@ -160,13 +169,32 @@ class _ProfilePageState extends State<ProfilePage> {
                     text: store.publicConfig.smsEnabled
                         ? '未绑定手机号，可绑定后使用短信验证码登录。'
                         : '未绑定手机号。当前短信服务未启用，暂无法绑定。',
-                    actionLabel:
-                        store.publicConfig.smsEnabled ? '绑定手机号' : null,
+                    actionLabel: store.publicConfig.smsEnabled ? '绑定手机号' : null,
                     onAction: store.publicConfig.smsEnabled
                         ? _openBindSheet
                         : null,
                   ),
                 ],
+                const SizedBox(height: 12),
+                ListenableBuilder(
+                  listenable: ThemeStore.instance,
+                  builder: (context, _) {
+                    final option = _themeOption(ThemeStore.instance.mode);
+                    return _SectionCard(
+                      title: '外观',
+                      children: [
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(option.icon),
+                          title: const Text('主题外观'),
+                          subtitle: Text(option.label),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: _openThemeSheet,
+                        ),
+                      ],
+                    );
+                  },
+                ),
                 const SizedBox(height: 12),
                 _SectionCard(
                   title: '报表',
@@ -220,7 +248,9 @@ class _AccountHeader extends StatelessWidget {
           radius: 26,
           backgroundColor: theme.colorScheme.primaryContainer,
           child: Text(
-            displayName.isEmpty ? '?' : displayName.characters.first.toUpperCase(),
+            displayName.isEmpty
+                ? '?'
+                : displayName.characters.first.toUpperCase(),
             style: theme.textTheme.titleLarge?.copyWith(
               color: theme.colorScheme.onPrimaryContainer,
             ),
@@ -236,8 +266,9 @@ class _AccountHeader extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.colorScheme.outline),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.outline,
+                  ),
                 ),
               ],
             ],
@@ -300,13 +331,12 @@ class _InfoTile extends StatelessWidget {
             width: 68,
             child: Text(
               label,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.outline),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.outline,
+              ),
             ),
           ),
-          Expanded(
-            child: Text(value, style: theme.textTheme.bodyMedium),
-          ),
+          Expanded(child: Text(value, style: theme.textTheme.bodyMedium)),
           ?trailing,
         ],
       ),
@@ -334,8 +364,9 @@ class _WarnTag extends StatelessWidget {
     final theme = Theme.of(context);
     return Text(
       text,
-      style: theme.textTheme.bodySmall
-          ?.copyWith(color: theme.colorScheme.error),
+      style: theme.textTheme.bodySmall?.copyWith(
+        color: theme.colorScheme.error,
+      ),
     );
   }
 }
@@ -357,13 +388,18 @@ class _ErrorBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline, size: 18, color: theme.colorScheme.onErrorContainer),
+          Icon(
+            Icons.error_outline,
+            size: 18,
+            color: theme.colorScheme.onErrorContainer,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.onErrorContainer),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onErrorContainer,
+              ),
             ),
           ),
           TextButton(onPressed: onRetry, child: const Text('重试')),
@@ -396,17 +432,73 @@ class _HintBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.info_outline, size: 18, color: theme.colorScheme.onSecondaryContainer),
+          Icon(
+            Icons.info_outline,
+            size: 18,
+            color: theme.colorScheme.onSecondaryContainer,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.onSecondaryContainer),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSecondaryContainer,
+              ),
             ),
           ),
           ?action,
         ],
+      ),
+    );
+  }
+}
+
+/// 主题外观候选：跟随系统 / 浅色 / 深色。
+const List<({ThemeMode mode, String label, IconData icon})> _themeOptions = [
+  (mode: ThemeMode.system, label: '跟随系统', icon: Icons.brightness_auto_outlined),
+  (mode: ThemeMode.light, label: '浅色', icon: Icons.light_mode_outlined),
+  (mode: ThemeMode.dark, label: '深色', icon: Icons.dark_mode_outlined),
+];
+
+({ThemeMode mode, String label, IconData icon}) _themeOption(ThemeMode mode) =>
+    _themeOptions.firstWhere((option) => option.mode == mode);
+
+/// 主题外观选择弹层：选中后立即生效并关闭。
+class _ThemeModeSheet extends StatelessWidget {
+  const _ThemeModeSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: ListenableBuilder(
+        listenable: ThemeStore.instance,
+        builder: (context, _) {
+          final current = ThemeStore.instance.mode;
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
+                child: Text('主题外观', style: theme.textTheme.titleMedium),
+              ),
+              for (final option in _themeOptions)
+                ListTile(
+                  leading: Icon(option.icon),
+                  title: Text(option.label),
+                  trailing: option.mode == current
+                      ? Icon(Icons.check, color: theme.colorScheme.primary)
+                      : null,
+                  onTap: () {
+                    ThemeStore.instance.setMode(option.mode);
+                    Navigator.of(context).pop();
+                  },
+                ),
+              const SizedBox(height: 8),
+            ],
+          );
+        },
       ),
     );
   }
@@ -523,8 +615,9 @@ class _BindPhoneSheetState extends State<_BindPhoneSheet> {
           const SizedBox(height: 4),
           Text(
             '绑定后可使用短信验证码登录。',
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: theme.colorScheme.outline),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.outline,
+            ),
           ),
           const SizedBox(height: 16),
           TextField(
@@ -563,9 +656,7 @@ class _BindPhoneSheetState extends State<_BindPhoneSheet> {
                 height: 56,
                 child: OutlinedButton(
                   onPressed: canSend ? _sendCode : null,
-                  child: Text(
-                    _countdown > 0 ? '${_countdown}s' : '发送验证码',
-                  ),
+                  child: Text(_countdown > 0 ? '${_countdown}s' : '发送验证码'),
                 ),
               ),
             ],
