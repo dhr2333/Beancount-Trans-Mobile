@@ -18,13 +18,49 @@ import '../review/review_list_page.dart';
 import '../todo/todo_list_page.dart';
 import 'assistant_drawer.dart';
 
-/// 空白会话页展示的示例问题。
+/// 首页（空白会话欢迎区）轮换展示的示例问句池。
+///
+/// 文案规范：
+/// 1. 必须是疑问句并以「？」结尾，用提问代替功能自述，避免「我可以帮你……」式口吻。
+/// 2. 正文字数 ≤ 19 字，保证移动端 chip 单行不折行。
+/// 3. 每句只对应一项 Copilot 真实能力：账户与标签、收支、余额与资产负债、大额与渠道、
+///    跨期对比与趋势、洞察与月度总结（洞察模式）、一句话生成待审核条目。
+/// 4. 不复述「Copilot 只读查询账本，不会改账」的只读约束，也不承诺账本外能力。
+/// 5. 时间用相对表述（上个月、今年、最近三个月），避免文案随日期过期。
+/// 6. 条数保持为「一次展示 4 条」的整数倍，避免最后一组不满；换组只发生在
+///    点击示例问句或开启新会话时，平时不自动变化。
 const List<String> kExampleQuestions = [
-  '提供一份消费洞察',
-  '有什么令人意外的消费发现？',
-  '帮我写一份月度总结',
+  // 账户与标签
+  '我有哪些账户和标签？',
+  '哪个标签的花销最多？',
+  '我常用哪些支付账户？',
+  // 收支
+  '上个月支出都花在哪了？',
+  '今年以来收入有多少？',
+  '今年和去年比花得多吗？',
+  // 余额与资产负债
+  '现在各账户余额是多少？',
+  '我的资产和负债各多少？',
+  '我的存款这半年在增加吗？',
+  '我今年一共结余了多少？',
+  // 大额与类目
   '最近有哪些大额消费？',
+  '哪些类目花销涨得最快？',
+  '上季度哪些类目花得最多？',
+  '哪些支出每个月都在重复？',
+  // 跨期与趋势
+  '这个月比上个月花得多吗？',
+  '最近三个月的支出趋势如何？',
+  // 洞察与总结
+  '有什么意外的消费发现？',
+  '能给我一份消费洞察吗？',
+  '能帮我写份月度总结吗？',
+  // 一句话记账（只生成待审核条目）
+  '能帮我把这笔花销记成账吗？',
 ];
+
+/// 首页示例问句一次展示的条数。
+const int _kExampleWindow = 4;
 
 /// Copilot 对话页：消息流 + SSE 流式生成。
 ///
@@ -58,6 +94,9 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
 
   /// 账单上传解析中（上传/解析期间禁用附件按钮）。
   bool _uploading = false;
+
+  /// 首页示例问句当前展示的分组下标（点击示例或开启新会话时前进一组）。
+  int _examplePage = 0;
 
   // ------------------------------------------------------------ 抽屉数据
   List<ChatSessionSummary> _sessions = const [];
@@ -554,6 +593,22 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
   /// 关闭抽屉（未打开时为空操作）。
   void _closeDrawer() => _scaffoldKey.currentState?.closeDrawer();
 
+  /// 首页示例问句的分组数。
+  int get _examplePageCount =>
+      (kExampleQuestions.length + _kExampleWindow - 1) ~/ _kExampleWindow;
+
+  /// 首页示例问句前进一组（重新进入欢迎区时才可见）。
+  void _advanceExamplePage() {
+    if (_examplePageCount <= 1) return;
+    _examplePage = (_examplePage + 1) % _examplePageCount;
+  }
+
+  /// 点击示例问句：换一组并直接发送。
+  void _onExampleSelected(String question) {
+    setState(_advanceExamplePage);
+    _send(retryText: question);
+  }
+
   /// 重置为空白新会话（不关闭抽屉）。
   void _resetChat() {
     _activeRequestId += 1;
@@ -566,6 +621,8 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
       _error = null;
       _sending = false;
       _loading = false;
+      // 开启新会话时换一组示例问句
+      _advanceExamplePage();
     });
   }
 
@@ -792,7 +849,8 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
               ),
               const SizedBox(height: 12),
               Text(
-                '你好，我可以帮你查询支出、收入、余额等账本信息。',
+                // '你好，我可以帮你查询支出、收入、余额等账本信息。',
+                '欢迎回来',
                 style: theme.textTheme.titleMedium,
                 textAlign: TextAlign.center,
               ),
@@ -805,20 +863,11 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                alignment: WrapAlignment.center,
-                children: [
-                  for (final question in kExampleQuestions)
-                    ActionChip(
-                      label: Text(question),
-                      // 助手不可用时禁用示例问题
-                      onPressed: canChat
-                          ? () => _send(retryText: question)
-                          : null,
-                    ),
-                ],
+              _ExampleChips(
+                questions: kExampleQuestions,
+                page: _examplePage,
+                enabled: canChat,
+                onSelect: _onExampleSelected,
               ),
               if (!canChat) ...[
                 const SizedBox(height: 12),
@@ -1214,6 +1263,48 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// 首页示例问句：一次展示 [_kExampleWindow] 条，[page] 指定当前分组，点击直接发送。
+///
+/// 只在点击示例问句或开启新会话时换组（[page] 由页面 State 持有），
+/// 平时不自动变化，避免手正要按下时 chips 被换走。
+class _ExampleChips extends StatelessWidget {
+  const _ExampleChips({
+    required this.questions,
+    required this.page,
+    required this.enabled,
+    required this.onSelect,
+  });
+
+  final List<String> questions;
+  final int page;
+  final bool enabled;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final start = page * _kExampleWindow;
+    final current = questions.skip(start).take(_kExampleWindow).toList();
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      child: Wrap(
+        // 分组下标作为 key，换组时触发淡入淡出
+        key: ValueKey(page),
+        spacing: 8,
+        runSpacing: 8,
+        alignment: WrapAlignment.center,
+        children: [
+          for (final question in current)
+            ActionChip(
+              label: Text(question),
+              // 助手不可用时禁用示例问题
+              onPressed: enabled ? () => onSelect(question) : null,
+            ),
+        ],
       ),
     );
   }
