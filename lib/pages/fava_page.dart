@@ -161,6 +161,11 @@ class _FavaPageState extends State<FavaPage> {
                   : () => _controller?.reload() ?? _resolve(),
               icon: const Icon(Icons.refresh),
             ),
+            IconButton(
+              tooltip: '退出报表',
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.close),
+            ),
           ],
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(2),
