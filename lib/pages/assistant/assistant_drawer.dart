@@ -17,7 +17,6 @@ class AssistantDrawer extends StatelessWidget {
     required this.currentSessionId,
     required this.todoBadge,
     required this.onSearchSubmitted,
-    required this.onNewChat,
     required this.onSelectSession,
     required this.onDeleteSession,
     required this.onOpenTodo,
@@ -33,7 +32,6 @@ class AssistantDrawer extends StatelessWidget {
   final String currentSessionId;
   final int todoBadge;
   final VoidCallback onSearchSubmitted;
-  final VoidCallback onNewChat;
   final ValueChanged<String> onSelectSession;
 
   /// 滑动删除会话：父级弹出确认框后自行移除。
@@ -65,25 +63,14 @@ class AssistantDrawer extends StatelessWidget {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Text('Copilot', style: theme.textTheme.titleMedium),
-              const Spacer(),
-              IconButton(
-                tooltip: '刷新',
-                onPressed: loading ? null : onRefresh,
-                icon: const Icon(Icons.refresh),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          FilledButton.tonalIcon(
-            onPressed: onNewChat,
-            icon: const Icon(Icons.add_comment_outlined, size: 18),
-            label: const Text('新对话'),
+          Text('Copilot', style: theme.textTheme.titleMedium),
+          const Spacer(),
+          IconButton(
+            tooltip: '刷新',
+            onPressed: loading ? null : onRefresh,
+            icon: const Icon(Icons.refresh),
           ),
         ],
       ),
@@ -140,8 +127,9 @@ class AssistantDrawer extends StatelessWidget {
               Text(
                 error!,
                 textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.error),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
               ),
               const SizedBox(height: 8),
               TextButton(onPressed: onRefresh, child: const Text('重试')),
@@ -155,8 +143,9 @@ class AssistantDrawer extends StatelessWidget {
       return Center(
         child: Text(
           '暂无历史会话',
-          style: theme.textTheme.bodySmall
-              ?.copyWith(color: theme.colorScheme.outline),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.outline,
+          ),
         ),
       );
     }

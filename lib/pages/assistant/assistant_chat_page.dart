@@ -697,13 +697,14 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
         currentSessionId: _sessionId,
         todoBadge: _todoBadge,
         onSearchSubmitted: _refreshDrawerData,
-        onNewChat: _onNewChat,
         onSelectSession: _onSelectSession,
         onDeleteSession: _onDeleteSession,
         onOpenTodo: _onOpenTodo,
         onOpenProfile: _onOpenProfile,
         onRefresh: _refreshDrawerData,
       ),
+      // 整屏均可横向右滑拖出抽屉（默认只响应左侧 20dp 的边缘拖动）
+      drawerEdgeDragWidth: MediaQuery.sizeOf(context).width,
       // 打开抽屉时刷新会话列表与待办徽标
       onDrawerChanged: (isOpened) {
         if (isOpened) _refreshDrawerData();
@@ -718,12 +719,15 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
         ),
         actions: [
           if (_status != null && !canChat)
-            const Padding(
-              padding: EdgeInsets.only(right: 12),
-              child: Center(
-                child: StatusChip(label: '助手不可用', tone: ChipTone.danger),
-              ),
+            const Center(
+              child: StatusChip(label: '助手不可用', tone: ChipTone.danger),
             ),
+          // 新建对话：参考 DeepSeek 移动端放在标题栏右侧
+          IconButton(
+            tooltip: '新对话',
+            onPressed: _onNewChat,
+            icon: const Icon(Icons.add_comment_outlined),
+          ),
         ],
       ),
       body: _loading && _messages.isEmpty
