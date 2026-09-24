@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/format.dart';
 import '../../models/assistant.dart';
 import '../../state/auth_store.dart';
 
@@ -51,8 +50,8 @@ class AssistantDrawer extends StatelessWidget {
             _buildSearchField(context),
             Expanded(child: _buildSessionList(context)),
             const Divider(height: 1),
-            _buildTodoTile(),
-            _buildProfileTile(),
+            _buildTodoTile(context),
+            _buildProfileTile(context),
           ],
         ),
       ),
@@ -151,10 +150,11 @@ class AssistantDrawer extends StatelessWidget {
     }
 
     return ListView.builder(
-      padding: EdgeInsets.zero,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       itemCount: sessions.length,
       itemBuilder: (context, index) {
         final session = sessions[index];
+        final selected = session.id == currentSessionId;
         return Dismissible(
           key: ValueKey(session.id),
           direction: DismissDirection.endToStart,
@@ -164,33 +164,56 @@ class AssistantDrawer extends StatelessWidget {
             return false;
           },
           background: Container(
+            margin: const EdgeInsets.only(bottom: 2),
             alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 20),
-            color: theme.colorScheme.errorContainer,
+            padding: const EdgeInsets.only(right: 16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.errorContainer,
+              borderRadius: BorderRadius.circular(10),
+            ),
             child: Icon(
               Icons.delete_outline,
               color: theme.colorScheme.onErrorContainer,
             ),
           ),
-          child: ListTile(
-            leading: const Icon(Icons.chat_bubble_outline),
-            title: Text(
-              session.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: () => onSelectSession(session.id),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: selected ? theme.colorScheme.primaryContainer : null,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  // 标题为空时与 Web 侧栏一致回退为「新对话」
+                  session.title.trim().isEmpty ? '新对话' : session.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    height: 1.3,
+                    color: selected
+                        ? theme.colorScheme.onPrimaryContainer
+                        : theme.colorScheme.onSurface,
+                    fontWeight: selected ? FontWeight.w500 : null,
+                  ),
+                ),
+              ),
             ),
-            subtitle: Text(FormatUtil.dateTime(session.modified)),
-            selected: session.id == currentSessionId,
-            trailing: const Icon(Icons.chevron_right, size: 18),
-            onTap: () => onSelectSession(session.id),
           ),
         );
       },
     );
   }
 
-  Widget _buildTodoTile() {
+  Widget _buildTodoTile(BuildContext context) {
     return ListTile(
+      titleTextStyle: Theme.of(context).textTheme.bodyMedium,
       leading: Badge(
         isLabelVisible: todoBadge > 0,
         label: Text('$todoBadge'),
@@ -202,12 +225,13 @@ class AssistantDrawer extends StatelessWidget {
     );
   }
 
-  Widget _buildProfileTile() {
+  Widget _buildProfileTile(BuildContext context) {
     return ListenableBuilder(
       listenable: AuthStore.instance,
       builder: (context, _) {
         final displayName = AuthStore.instance.user?.displayName ?? '';
         return ListTile(
+          titleTextStyle: Theme.of(context).textTheme.bodyMedium,
           leading: CircleAvatar(
             child: Text(
               displayName.isEmpty
