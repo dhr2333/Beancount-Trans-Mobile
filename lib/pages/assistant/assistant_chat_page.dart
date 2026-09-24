@@ -1172,13 +1172,8 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
 
     return SafeArea(
       top: false,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-        decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(color: theme.colorScheme.outlineVariant),
-          ),
-        ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1194,26 +1189,18 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
                   ),
                 ),
               ),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (_uploading)
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(6, 0, 10, 12),
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                else
-                  IconButton(
-                    tooltip: '上传账单解析',
-                    onPressed: _pickAndUploadBill,
-                    icon: const Icon(Icons.attach_file),
-                  ),
-                Expanded(
-                  child: TextField(
+            // 胶囊输入框：第一行文本输入，第二行从左到右为深度思考 / 文件 / 发送
+            Container(
+              padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
                     controller: _input,
                     minLines: 1,
                     maxLines: 4,
@@ -1222,45 +1209,93 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
                     decoration: const InputDecoration(
                       hintText: '输入问题…',
                       isDense: true,
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 12,
-                      ),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(vertical: 6),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                if (_sending)
-                  IconButton.filledTonal(
-                    tooltip: '停止生成',
-                    onPressed: _stop,
-                    icon: const Icon(Icons.stop),
-                  )
-                else
-                  IconButton.filled(
-                    tooltip: '发送',
-                    onPressed: canChat ? () => _send() : null,
-                    icon: const Icon(Icons.arrow_upward),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      if (deepThinkSupported)
+                        FilterChip(
+                          label: const Text('深度思考'),
+                          avatar: const Icon(Icons.lightbulb_outline, size: 16),
+                          selected: _deepThink,
+                          // 发送中禁用：onSelected 为空即为禁用态
+                          onSelected: _sending
+                              ? null
+                              : (value) => setState(() => _deepThink = value),
+                          showCheckmark: false,
+                          side: BorderSide.none,
+                          backgroundColor:
+                              theme.colorScheme.surfaceContainerHighest,
+                          selectedColor: theme.colorScheme.primaryContainer,
+                          labelStyle: theme.textTheme.labelMedium,
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                      const Spacer(),
+                      if (_uploading)
+                        const SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: Center(
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        )
+                      else
+                        IconButton(
+                          tooltip: '上传账单解析',
+                          onPressed: _pickAndUploadBill,
+                          icon: const Icon(Icons.attach_file),
+                          iconSize: 20,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints.tightFor(
+                            width: 40,
+                            height: 40,
+                          ),
+                        ),
+                      if (_sending)
+                        IconButton.filledTonal(
+                          tooltip: '停止生成',
+                          onPressed: _stop,
+                          icon: const Icon(Icons.stop),
+                          iconSize: 20,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints.tightFor(
+                            width: 40,
+                            height: 40,
+                          ),
+                          style: IconButton.styleFrom(
+                            shape: const CircleBorder(),
+                          ),
+                        )
+                      else
+                        IconButton.filled(
+                          tooltip: '发送',
+                          onPressed: canChat ? () => _send() : null,
+                          icon: const Icon(Icons.arrow_upward),
+                          iconSize: 20,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints.tightFor(
+                            width: 40,
+                            height: 40,
+                          ),
+                          style: IconButton.styleFrom(
+                            shape: const CircleBorder(),
+                          ),
+                        ),
+                    ],
                   ),
-              ],
-            ),
-            if (deepThinkSupported)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Row(
-                  children: [
-                    Switch(
-                      value: _deepThink,
-                      onChanged: _sending
-                          ? null
-                          : (value) => setState(() => _deepThink = value),
-                    ),
-                    const SizedBox(width: 4),
-                    Text('深度思考', style: theme.textTheme.bodySmall),
-                  ],
-                ),
+                ],
               ),
+            ),
           ],
         ),
       ),
