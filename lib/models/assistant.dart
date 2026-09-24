@@ -24,7 +24,8 @@ class AssistantStatus {
 
   bool get canChat => apiKeyConfigured && ledgerExists;
 
-  factory AssistantStatus.fromJson(Map<String, Object?> json) => AssistantStatus(
+  factory AssistantStatus.fromJson(Map<String, Object?> json) =>
+      AssistantStatus(
         apiKeyConfigured: json['api_key_configured'] == true,
         assistantModel: '${json['assistant_model'] ?? ''}',
         deepThinkSupported: json['deep_think_supported'] == true,
@@ -42,7 +43,8 @@ class QueryReportLink {
   final String label;
   final String path;
 
-  factory QueryReportLink.fromJson(Map<String, Object?> json) => QueryReportLink(
+  factory QueryReportLink.fromJson(Map<String, Object?> json) =>
+      QueryReportLink(
         name: '${json['name'] ?? ''}',
         label: '${json['label'] ?? ''}',
         path: '${json['path'] ?? ''}',
@@ -77,12 +79,16 @@ class QueryRecord {
   }
 
   Map<String, Object?> toJson() => {
-        'bql': bql,
-        'result_preview': resultPreview,
-        if (favaPath != null) 'fava_path': favaPath,
-        if (report != null)
-          'report': {'name': report!.name, 'label': report!.label, 'path': report!.path},
-      };
+    'bql': bql,
+    'result_preview': resultPreview,
+    if (favaPath != null) 'fava_path': favaPath,
+    if (report != null)
+      'report': {
+        'name': report!.name,
+        'label': report!.label,
+        'path': report!.path,
+      },
+  };
 }
 
 /// 会话列表项。
@@ -148,14 +154,17 @@ class StoredChatMessage {
       reasoning: '${json['reasoning'] ?? ''}',
       queries: rawQueries is List
           ? rawQueries
-              .whereType<Map>()
-              .map((e) => QueryRecord.fromJson(e.cast<String, Object?>()))
-              .toList()
+                .whereType<Map>()
+                .map((e) => QueryRecord.fromJson(e.cast<String, Object?>()))
+                .toList()
           : const [],
-      position:
-          rawPosition is int ? rawPosition : int.tryParse('${rawPosition ?? ''}') ?? 0,
+      position: rawPosition is int
+          ? rawPosition
+          : int.tryParse('${rawPosition ?? ''}') ?? 0,
       generationStatus: '${json['generation_status'] ?? ''}',
-      feedback: rawFeedback is String && rawFeedback.isNotEmpty ? rawFeedback : null,
+      feedback: rawFeedback is String && rawFeedback.isNotEmpty
+          ? rawFeedback
+          : null,
       created: '${json['created'] ?? ''}',
     );
   }
@@ -187,9 +196,11 @@ class ChatSessionDetail {
       titleLocked: json['title_locked'] == true,
       messages: rawMessages is List
           ? rawMessages
-              .whereType<Map>()
-              .map((e) => StoredChatMessage.fromJson(e.cast<String, Object?>()))
-              .toList()
+                .whereType<Map>()
+                .map(
+                  (e) => StoredChatMessage.fromJson(e.cast<String, Object?>()),
+                )
+                .toList()
           : const [],
       created: '${json['created'] ?? ''}',
       modified: '${json['modified'] ?? ''}',
@@ -207,6 +218,7 @@ class ChatMessage {
     this.reasoning = '',
     this.thinkingExpanded = false,
     List<QueryRecord>? queries,
+    this.queriesExpanded = false,
     this.streaming = false,
     this.status,
     this.feedback,
@@ -221,6 +233,9 @@ class ChatMessage {
   String reasoning;
   bool thinkingExpanded;
   List<QueryRecord> queries;
+
+  /// BQL 查询区块的展开态，仅用于 UI，不落服务端。
+  bool queriesExpanded;
   bool streaming;
 
   /// thinking | querying | writing
@@ -234,18 +249,18 @@ class ChatMessage {
   bool get isUser => role == 'user';
 
   factory ChatMessage.fromStored(StoredChatMessage message) => ChatMessage(
-        id: message.id,
-        role: message.role,
-        content: message.content,
-        thinking: message.thinking,
-        reasoning: message.reasoning,
-        // 正在生成的历史消息默认展开思考过程
-        thinkingExpanded: message.isGenerating,
-        queries: [...message.queries],
-        streaming: message.isGenerating,
-        status: message.isGenerating ? 'thinking' : null,
-        feedback: message.feedback,
-      );
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    thinking: message.thinking,
+    reasoning: message.reasoning,
+    // 正在生成的历史消息默认展开思考过程
+    thinkingExpanded: message.isGenerating,
+    queries: [...message.queries],
+    streaming: message.isGenerating,
+    status: message.isGenerating ? 'thinking' : null,
+    feedback: message.feedback,
+  );
 
   /// 是否为「被中断」的空回复。
   bool get isInterrupted {
@@ -289,9 +304,9 @@ class ToolEndPayload {
       (bql ?? '').isNotEmpty && (resultPreview ?? '').isNotEmpty;
 
   QueryRecord toQueryRecord() => QueryRecord(
-        bql: bql ?? '',
-        resultPreview: resultPreview ?? '',
-        favaPath: favaPath,
-        report: report,
-      );
+    bql: bql ?? '',
+    resultPreview: resultPreview ?? '',
+    favaPath: favaPath,
+    report: report,
+  );
 }

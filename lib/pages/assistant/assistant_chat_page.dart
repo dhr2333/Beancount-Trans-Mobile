@@ -921,6 +921,7 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
               ),
               child: _buildThinkingText(message),
             ),
+          if (message.queries.isNotEmpty) _buildQuerySection(message),
           if (message.content.trim().isNotEmpty)
             _buildReplyText(message)
           else if (message.streaming)
@@ -932,7 +933,6 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
             ),
-          for (final query in message.queries) _buildQueryCard(query),
           if (message.isInterrupted && !message.streaming)
             Padding(
               padding: const EdgeInsets.only(top: 4),
@@ -975,56 +975,101 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
     return MarkdownContent(content: message.content);
   }
 
-  Widget _buildQueryCard(QueryRecord query) {
+  /// BQL 查询区块：整条消息的查询合并为一个折叠入口，默认折叠。
+  Widget _buildQuerySection(ChatMessage message) {
     final theme = Theme.of(context);
-    return Card(
-      margin: const EdgeInsets.only(top: 8),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.search, size: 16, color: theme.colorScheme.primary),
-                const SizedBox(width: 6),
-                Text(
-                  query.report?.label.isNotEmpty == true
-                      ? query.report!.label
-                      : 'BQL 查询',
-                  style: theme.textTheme.labelLarge,
-                ),
-                const Spacer(),
-                if (query.favaPath != null && query.favaPath!.isNotEmpty)
-                  TextButton(
-                    onPressed: () => _openFava(query.favaPath!),
-                    child: const Text('查看报表'),
-                  ),
-              ],
+    final queries = message.queries;
+    final expanded = message.queriesExpanded;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () => setState(
+              () => message.queriesExpanded = !message.queriesExpanded,
             ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Icon(
+                    expanded ? Icons.expand_more : Icons.chevron_right,
+                    size: 18,
+                    color: theme.colorScheme.outline,
+                  ),
+                  Text(
+                    queries.length > 1 ? 'BQL 查询（${queries.length}）' : 'BQL 查询',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.outline,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (expanded)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(8),
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: SelectableText(
-                query.bql,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontFamily: 'monospace',
-                  height: 1.4,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var i = 0; i < queries.length; i++) ...[
+                    if (i > 0) const Divider(height: 24),
+                    _buildQueryDetail(queries[i]),
+                  ],
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            SelectableText(
-              query.resultPreview,
-              style: theme.textTheme.bodySmall?.copyWith(height: 1.4),
-            ),
-          ],
-        ),
+        ],
       ),
+    );
+  }
+
+  /// 单条 BQL 明细：报表名与入口（可选）+ BQL；结果仅通过报表跳转查看。
+  Widget _buildQueryDetail(QueryRecord query) {
+    final theme = Theme.of(context);
+    final label = query.report?.label ?? '';
+    final hasFava = query.favaPath != null && query.favaPath!.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (label.isNotEmpty || hasFava)
+          Row(
+            children: [
+              if (label.isNotEmpty)
+                Expanded(
+                  child: Text(
+                    label,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.outline,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              if (hasFava)
+                TextButton(
+                  onPressed: () => _openFava(query.favaPath!),
+                  child: const Text('查看报表'),
+                ),
+            ],
+          ),
+        SelectableText(
+          query.bql,
+          style: theme.textTheme.bodySmall?.copyWith(
+            fontFamily: 'monospace',
+            height: 1.4,
+          ),
+        ),
+      ],
     );
   }
 
