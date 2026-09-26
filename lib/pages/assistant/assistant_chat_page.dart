@@ -7,6 +7,7 @@ import '../../core/sse_client.dart';
 import '../../models/assistant.dart';
 import '../../models/parse_review.dart';
 import '../../services/assistant_service.dart';
+import '../../services/badge_service.dart';
 import '../../services/todo_service.dart';
 import '../../services/translate_service.dart';
 import '../../widgets/markdown_content.dart';
@@ -76,7 +77,8 @@ class AssistantChatPage extends StatefulWidget {
   State<AssistantChatPage> createState() => _AssistantChatPageState();
 }
 
-class _AssistantChatPageState extends State<AssistantChatPage> {
+class _AssistantChatPageState extends State<AssistantChatPage>
+    with WidgetsBindingObserver {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final TextEditingController _input = TextEditingController();
   final TextEditingController _sessionSearch = TextEditingController();
@@ -112,16 +114,24 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
   void initState() {
     super.initState();
     _sessionId = widget.sessionId ?? '';
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _cancelToken?.cancel();
     _input.dispose();
     _sessionSearch.dispose();
     _scroll.dispose();
     super.dispose();
+  }
+
+  /// 回到前台时重新同步待办（应用可能已在后台停留很久，待办会过期）。
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshDrawerData();
   }
 
   Future<void> _bootstrap() async {
@@ -148,10 +158,13 @@ class _AssistantChatPageState extends State<AssistantChatPage> {
         TodoService.instance.badgeCount(),
       ]);
       if (!mounted) return;
+      final badge = results[1] as int;
       setState(() {
         _sessions = results[0] as List<ChatSessionSummary>;
-        _todoBadge = results[1] as int;
+        _todoBadge = badge;
       });
+      // 同步系统图标气泡；失败不影响抽屉数据（BadgeService 内部已吞异常）
+      await BadgeService.instance.setCount(badge);
     } on ApiException catch (error) {
       if (mounted) setState(() => _drawerError = error.message);
     } finally {

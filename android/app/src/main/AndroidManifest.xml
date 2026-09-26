@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- release 包必须显式声明，否则无网络（flutter create 只在 debug/profile 的 manifest 里声明） -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Android 13+ 通知为运行时权限；通知驱动角标必须存在活跃通知 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="Beancount-Trans"
         android:name="${applicationName}"

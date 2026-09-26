@@ -5,6 +5,7 @@ import '../core/jwt.dart';
 import '../core/token_store.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
+import '../services/badge_service.dart';
 import '../services/fava_service.dart';
 
 enum AuthStatus { unknown, loggedOut, loggedIn }
@@ -139,13 +140,14 @@ class AuthStore extends ChangeNotifier {
     await refreshBindings();
   }
 
-  /// 退出登录：先停止 Fava 实例，再清空本地令牌。
+  /// 退出登录：先停止 Fava 实例与待办角标，再清空本地令牌。
   Future<void> logout() async {
     try {
       await FavaService.instance.stopFava();
     } catch (_) {
       // 停止实例失败不影响退出登录
     }
+    await BadgeService.instance.clear();
     await TokenStore.instance.clear();
     _user = null;
     _bindings = null;
@@ -169,6 +171,8 @@ class AuthStore extends ChangeNotifier {
   void _handleSessionExpired() {
     if (_status == AuthStatus.loggedOut) return;
     TokenStore.instance.clear();
+    // 登录态失效同样要清掉系统角标（无需等待结果）
+    BadgeService.instance.clear();
     _user = null;
     _bindings = null;
     _sessionExpired = true;
