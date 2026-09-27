@@ -21,6 +21,8 @@
  *
  * 注意：本仓库不涉及 Docker 镜像构建与服务器 SSH 部署，所有 flutter/gradle 命令
  *       都先 source 共享工具链目录（TOOLCHAIN_ROOT）下的 env.sh，复用仓库外的缓存与 SDK。
+ *       但参考 Backend/Frontend/Docs 的流水线，构建前会临时停止宿主机上占用内存的容器，
+ *       构建结束后在 post.always 中统一重新启动，为 flutter/gradle 构建让出内存。
  */
 
 pipeline {
@@ -52,6 +54,9 @@ pipeline {
 
         // release APK 产物路径
         APK_PATH = 'build/app/outputs/flutter-apk/app-release.apk'
+
+        // 构建期间需临时停止的容器（释放内存给 flutter/gradle），构建结束后在 post.always 统一启动
+        SUSPENDED_CONTAINERS = 'beancount-trans-docs beancount-trans-beat manage-beancount-trans-worker-1 beancount-trans-mcp beancount-trans-backend beancount-trans-frontend odoo19 postgres gitea'
     }
 
     stages {
@@ -70,6 +75,15 @@ pipeline {
                     echo "工作目录: ${env.WORKSPACE}"
 
                     updateGitHubStatus('pending', '开始构建...')
+                }
+            }
+        }
+
+        stage('停止占用内存的容器') {
+            steps {
+                script {
+                    echo "⏹️ 构建前停止占用内存的容器（${env.SUSPENDED_CONTAINERS}）..."
+                    sh "docker stop ${env.SUSPENDED_CONTAINERS} 2>/dev/null || true"
                 }
             }
         }
@@ -216,6 +230,10 @@ pipeline {
         }
 
         always {
+            script {
+                echo "▶️ 重新启动构建前停止的容器（${env.SUSPENDED_CONTAINERS}）..."
+                sh "docker start ${env.SUSPENDED_CONTAINERS} 2>/dev/null || true"
+            }
             cleanWs()
         }
     }
