@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.0](https://github.com/dhr2333/Beancount-Trans-Mobile/compare/1.1.0...1.2.0) (2026-09-27)
+
+### Features
+
+* **shared-ledger:** 实现完整的共享账本功能支持 ([d03562a](https://github.com/dhr2333/Beancount-Trans-Mobile/commit/d03562a18f9aef9f6a74cf283c4bbc9826638bd1))
+
 ## [1.1.0](https://github.com/dhr2333/Beancount-Trans-Mobile/compare/1.0.0...1.1.0) (2026-09-26)
 
 ### Features
