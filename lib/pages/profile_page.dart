@@ -4,10 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/api_exception.dart';
+import '../core/format.dart';
+import '../models/assistant.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 import '../state/auth_store.dart';
+import '../state/shared_ledger_store.dart';
 import '../state/theme_store.dart';
+import '../widgets/add_shared_ledger_sheet.dart';
 import 'fava_page.dart';
 
 /// 「我的」页：账号绑定信息、手机号绑定入口、Fava 报表入口、退出登录。
@@ -40,6 +44,8 @@ class _ProfilePageState extends State<ProfilePage> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+    // 共享账本列表的加载错误记录在 store 自身，不影响账号信息展示
+    await SharedLedgerStore.instance.refresh();
   }
 
   Future<void> _openBindSheet() async {
@@ -214,6 +220,81 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 12),
+                _SectionCard(
+                  title: '共享账本',
+                  children: [
+                    ListenableBuilder(
+                      listenable: SharedLedgerStore.instance,
+                      builder: (context, _) {
+                        final store = SharedLedgerStore.instance;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: () =>
+                                    showAddSharedLedgerSheet(context),
+                                icon: const Icon(Icons.add),
+                                label: const Text('添加共享账本'),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            if (store.loading && store.bindings.isEmpty)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            else if (store.error != null &&
+                                store.bindings.isEmpty)
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      store.error!,
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: theme.colorScheme.error,
+                                          ),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () =>
+                                        SharedLedgerStore.instance.refresh(),
+                                    child: const Text('重试'),
+                                  ),
+                                ],
+                              )
+                            else if (store.bindings.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 6,
+                                ),
+                                child: Text(
+                                  '暂无共享账本',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.outline,
+                                  ),
+                                ),
+                              )
+                            else
+                              for (final binding in store.bindings)
+                                _SharedLedgerRow(binding: binding),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 24),
                 OutlinedButton.icon(
                   onPressed: _confirmLogout,
@@ -366,6 +447,81 @@ class _WarnTag extends StatelessWidget {
       text,
       style: theme.textTheme.bodySmall?.copyWith(
         color: theme.colorScheme.error,
+      ),
+    );
+  }
+}
+
+/// 单条共享账本绑定：别名、来源用户、状态、令牌有效期与最后使用时间。
+class _SharedLedgerRow extends StatelessWidget {
+  const _SharedLedgerRow({required this.binding});
+
+  final SharedLedgerBinding binding;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final expiresAt = binding.expiresAt.trim();
+    final lastUsedAt = binding.lastUsedAt.trim();
+    final expiresText = expiresAt.isEmpty
+        ? '长期有效'
+        : FormatUtil.dateTime(expiresAt);
+    final lastUsedText = lastUsedAt.isEmpty
+        ? '未使用'
+        : FormatUtil.dateTime(lastUsedAt);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.menu_book_outlined,
+            size: 18,
+            color: theme.colorScheme.outline,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        binding.aliasesLabel,
+                        style: theme.textTheme.bodyMedium,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      binding.usable ? '有效' : '已失效',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: binding.usable
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.error,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '来源用户：${binding.ownerUsername}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.outline,
+                  ),
+                ),
+                Text(
+                  '令牌有效期：$expiresText · 最后使用：$lastUsedText',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.outline,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -11,6 +11,7 @@ class AssistantStatus {
     this.assistantModel = '',
     this.deepThinkSupported = false,
     this.ledgerExists = false,
+    this.hasUsableSharedLedger = false,
     this.ledgerPath = '',
     this.referenceDate = '',
   });
@@ -18,11 +19,17 @@ class AssistantStatus {
   final bool apiKeyConfigured;
   final String assistantModel;
   final bool deepThinkSupported;
+
+  /// 本人账本是否存在（仅反映本人账本，不含共享账本）。
   final bool ledgerExists;
+
+  /// 是否存在可用的共享账本（他人共享给当前用户）。
+  final bool hasUsableSharedLedger;
   final String ledgerPath;
   final String referenceDate;
 
-  bool get canChat => apiKeyConfigured && ledgerExists;
+  bool get canChat =>
+      apiKeyConfigured && (ledgerExists || hasUsableSharedLedger);
 
   factory AssistantStatus.fromJson(Map<String, Object?> json) =>
       AssistantStatus(
@@ -30,9 +37,53 @@ class AssistantStatus {
         assistantModel: '${json['assistant_model'] ?? ''}',
         deepThinkSupported: json['deep_think_supported'] == true,
         ledgerExists: json['ledger_exists'] == true,
+        hasUsableSharedLedger: json['has_usable_shared_ledger'] == true,
         ledgerPath: '${json['ledger_path'] ?? ''}',
         referenceDate: '${json['reference_date'] ?? ''}',
       );
+}
+
+/// `GET /assistant/shared-ledgers/` 中的一个共享账本绑定。
+class SharedLedgerBinding {
+  const SharedLedgerBinding({
+    this.id = 0,
+    this.ownerUsername = '',
+    this.aliases = const [],
+    this.usable = false,
+    this.expiresAt = '',
+    this.lastUsedAt = '',
+    this.created = '',
+  });
+
+  final int id;
+  final String ownerUsername;
+  final List<String> aliases;
+  final bool usable;
+  final String expiresAt;
+  final String lastUsedAt;
+  final String created;
+
+  /// Copilot 匹配到该账本时用于展示的名称：优先取第一个别名，否则用来源用户名。
+  String get displayName => aliases.isNotEmpty ? aliases.first : ownerUsername;
+
+  /// 别名列表展示文案（无别名时为占位符）。
+  String get aliasesLabel => aliases.isEmpty ? '—' : aliases.join('、');
+
+  factory SharedLedgerBinding.fromJson(Map<String, Object?> json) {
+    final rawId = json['id'];
+    final rawAliases = json['aliases'];
+    return SharedLedgerBinding(
+      id: rawId is int ? rawId : int.tryParse('${rawId ?? ''}') ?? 0,
+      ownerUsername: '${json['owner_username'] ?? ''}',
+      aliases: rawAliases is List
+          ? rawAliases.whereType<String>().toList()
+          : const [],
+      usable: json['usable'] == true,
+      expiresAt: '${json['expires_at'] ?? ''}',
+      lastUsedAt: '${json['last_used_at'] ?? ''}',
+      created: '${json['created'] ?? ''}',
+    );
+  }
 }
 
 /// BQL 查询卡片关联的报表链接。
@@ -56,12 +107,17 @@ class QueryRecord {
   const QueryRecord({
     this.bql = '',
     this.resultPreview = '',
+    this.ledger = '',
     this.favaPath,
     this.report,
   });
 
   final String bql;
   final String resultPreview;
+
+  /// 该查询命中的账本标识：共享账本的别名或来源用户名；
+  /// `'self'` 或空串表示本人账本。
+  final String ledger;
   final String? favaPath;
   final QueryReportLink? report;
 
@@ -71,6 +127,7 @@ class QueryRecord {
     return QueryRecord(
       bql: '${json['bql'] ?? ''}',
       resultPreview: '${json['result_preview'] ?? ''}',
+      ledger: '${json['ledger'] ?? ''}',
       favaPath: rawPath is String && rawPath.isNotEmpty ? rawPath : null,
       report: rawReport is Map
           ? QueryReportLink.fromJson(rawReport.cast<String, Object?>())
@@ -81,6 +138,7 @@ class QueryRecord {
   Map<String, Object?> toJson() => {
     'bql': bql,
     'result_preview': resultPreview,
+    if (ledger.isNotEmpty) 'ledger': ledger,
     if (favaPath != null) 'fava_path': favaPath,
     if (report != null)
       'report': {

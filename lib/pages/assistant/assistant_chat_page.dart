@@ -10,6 +10,8 @@ import '../../services/assistant_service.dart';
 import '../../services/badge_service.dart';
 import '../../services/todo_service.dart';
 import '../../services/translate_service.dart';
+import '../../state/shared_ledger_store.dart';
+import '../../widgets/add_shared_ledger_sheet.dart';
 import '../../widgets/markdown_content.dart';
 import '../../widgets/status_chip.dart';
 import '../fava_page.dart';
@@ -100,6 +102,9 @@ class _AssistantChatPageState extends State<AssistantChatPage>
   /// 首页示例问句当前展示的分组下标（点击示例或开启新会话时前进一组）。
   int _examplePage = 0;
 
+  /// 剪贴板令牌提示弹窗是否正在展示（避免重复弹出）。
+  bool _clipboardPrompting = false;
+
   // ------------------------------------------------------------ 抽屉数据
   List<ChatSessionSummary> _sessions = const [];
   bool _drawerLoading = false;
@@ -115,12 +120,14 @@ class _AssistantChatPageState extends State<AssistantChatPage>
     super.initState();
     _sessionId = widget.sessionId ?? '';
     WidgetsBinding.instance.addObserver(this);
+    SharedLedgerStore.instance.addListener(_onSharedLedgerChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    SharedLedgerStore.instance.removeListener(_onSharedLedgerChanged);
     _cancelToken?.cancel();
     _input.dispose();
     _sessionSearch.dispose();
@@ -128,20 +135,79 @@ class _AssistantChatPageState extends State<AssistantChatPage>
     super.dispose();
   }
 
-  /// 回到前台时重新同步待办（应用可能已在后台停留很久，待办会过期）。
+  /// 共享账本变化（加载完成 / 新添加）时刷新来源标注。
+  void _onSharedLedgerChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// 回到前台时重新同步待办（应用可能已在后台停留很久，待办会过期），
+  /// 并检测剪贴板中的共享账本令牌。
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _refreshDrawerData();
+    if (state == AppLifecycleState.resumed) {
+      _refreshDrawerData();
+      _maybePromptClipboardToken();
+    }
   }
 
   Future<void> _bootstrap() async {
     await _loadStatus();
+    // 共享账本列表：仅用于来源标注与可用数量，失败由 store 内部记录
+    SharedLedgerStore.instance.refresh();
     // 抽屉数据（会话列表 + 待办徽标）不阻塞主流程
     _refreshDrawerData();
     if (_sessionId.isNotEmpty) {
       await _loadSession(_sessionId);
     } else {
       setState(() => _loading = false);
+    }
+    await _maybePromptClipboardToken();
+  }
+
+  /// 检测剪贴板中的共享账本访问令牌并提示添加。
+  ///
+  /// 同一令牌只提醒一次（指纹由 store 记录）；弹窗展示中或被占用时直接跳过，
+  /// 且**不消费指纹**，避免错过提示。
+  Future<void> _maybePromptClipboardToken() async {
+    if (!mounted || _sending || _clipboardPrompting) return;
+
+    final token = await SharedLedgerStore.instance.takeClipboardToken();
+    if (!mounted || token == null || _sending || _clipboardPrompting) return;
+
+    _clipboardPrompting = true;
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('发现共享账本令牌'),
+          content: Text(
+            '剪贴板中检测到访问令牌 `${token.substring(0, 12)}…`。'
+            '若这是他人分享给你的账本令牌，可添加后让 Copilot 一起分析。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('稍后'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('添加'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+
+      final added = await showAddSharedLedgerSheet(
+        context,
+        initialToken: token,
+      );
+      if (added == true && mounted) {
+        await _loadStatus();
+        await SharedLedgerStore.instance.refresh();
+      }
+    } finally {
+      _clipboardPrompting = false;
     }
   }
 
@@ -278,6 +344,7 @@ class _AssistantChatPageState extends State<AssistantChatPage>
             QueryRecord(
               bql: bql,
               resultPreview: preview,
+              ledger: data['ledger'] is String ? data['ledger'] as String : '',
               favaPath: data['fava_path'] is String
                   ? data['fava_path'] as String
                   : null,
@@ -1099,15 +1166,38 @@ class _AssistantChatPageState extends State<AssistantChatPage>
     );
   }
 
-  /// 单条 BQL 明细：报表名与入口（可选）+ BQL；结果仅通过报表跳转查看。
+  /// 把查询记录的账本标识解析为展示名；本人账本（`self`/空）返回 `null`。
+  String? _sharedLedgerLabel(String ledger) {
+    if (ledger.isEmpty || ledger == 'self') return null;
+    for (final binding in SharedLedgerStore.instance.bindings) {
+      if (binding.aliases.contains(ledger) || binding.ownerUsername == ledger) {
+        return binding.displayName;
+      }
+    }
+    return ledger;
+  }
+
+  /// 单条 BQL 明细：来源标注（可选）+ 报表名与入口（可选）+ BQL。
+  ///
+  /// 共享账本记录后端不返回 `fava_path`/`report`，因此天然不显示 Fava 链接。
   Widget _buildQueryDetail(QueryRecord query) {
     final theme = Theme.of(context);
     final label = query.report?.label ?? '';
     final hasFava = query.favaPath != null && query.favaPath!.isNotEmpty;
+    final source = _sharedLedgerLabel(query.ledger);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (source != null) ...[
+          Text(
+            '来源：$source',
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.outline,
+            ),
+          ),
+          const SizedBox(height: 2),
+        ],
         if (label.isNotEmpty || hasFava)
           Row(
             children: [
@@ -1195,8 +1285,8 @@ class _AssistantChatPageState extends State<AssistantChatPage>
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Text(
                   _status!.apiKeyConfigured
-                      ? '账本文件不存在，助手暂时不可用'
-                      : '尚未配置大模型 API Key，助手暂时不可用',
+                      ? '请先在 Web 上传并解析账单，或在『我的 → 共享账本』添加他人共享的账本。'
+                      : '尚未配置 Copilot，请在 Web 的『输出配置』填写接口与密钥。',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.error,
                   ),
