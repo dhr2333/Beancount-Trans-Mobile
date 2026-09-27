@@ -23,4 +23,10 @@ class ApiConfig {
 
   /// SSE 空闲超时：超过该时长未收到任何帧则中止请求。
   static const Duration sseIdleTimeout = Duration(seconds: 90);
+
+  /// 应用内更新的来源仓库（owner/repo）：Release 与 APK 附件都从这里获取。
+  static const String releaseRepo = String.fromEnvironment(
+    'RELEASE_REPO',
+    defaultValue: 'dhr2333/Beancount-Trans-Mobile',
+  );
 }

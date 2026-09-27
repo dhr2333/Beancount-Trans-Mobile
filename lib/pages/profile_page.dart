@@ -8,10 +8,12 @@ import '../core/format.dart';
 import '../models/assistant.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
+import '../services/update_service.dart';
 import '../state/auth_store.dart';
 import '../state/shared_ledger_store.dart';
 import '../state/theme_store.dart';
 import '../widgets/add_shared_ledger_sheet.dart';
+import '../widgets/update_dialog.dart';
 import 'fava_page.dart';
 
 /// 「我的」页：账号绑定信息、手机号绑定入口、Fava 报表入口、退出登录。
@@ -26,10 +28,39 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _loading = false;
   String? _error;
 
+  /// 当前版本展示文案（含构建号），读取完成前为空。
+  String _versionLabel = '';
+  bool _checkingUpdate = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final label = await UpdateService.instance.currentVersionLabel();
+    if (mounted) setState(() => _versionLabel = label);
+  }
+
+  /// 手动检查更新：已是最新或失败都直接提示，不做静默处理。
+  Future<void> _checkUpdate() async {
+    if (_checkingUpdate) return;
+    setState(() => _checkingUpdate = true);
+    try {
+      final info = await UpdateService.instance.checkForUpdate();
+      if (!mounted) return;
+      if (info == null) {
+        _notify('当前已是最新版本');
+        return;
+      }
+      await showUpdateDialog(context, info, manual: true);
+    } on UpdateException catch (error) {
+      _notify(error.message);
+    } finally {
+      if (mounted) setState(() => _checkingUpdate = false);
+    }
   }
 
   Future<void> _load() async {
@@ -292,6 +323,31 @@ class _ProfilePageState extends State<ProfilePage> {
                           ],
                         );
                       },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _SectionCard(
+                  title: '关于',
+                  children: [
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.info_outline),
+                      title: const Text('当前版本'),
+                      subtitle: Text(
+                        _versionLabel.isEmpty ? '读取中…' : _versionLabel,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      trailing: _checkingUpdate
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : TextButton(
+                              onPressed: _checkUpdate,
+                              child: const Text('检查更新'),
+                            ),
                     ),
                   ],
                 ),
