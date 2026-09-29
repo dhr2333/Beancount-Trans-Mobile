@@ -36,6 +36,14 @@ class BeancountTransApp extends StatelessWidget {
     useMaterial3: true,
     colorSchemeSeed: _brandSeed,
     brightness: brightness,
+    // 顶栏在滚动时保持配色稳定：Material 3 默认给 AppBar 设了
+    // scrolledUnderElevation=3，内容滚到标题栏下方时会叠加一层 surfaceTint，
+    // 表现为「下拉时顶部变色」。系统滚动截屏（长截图）靠相邻两帧中固定区域
+    // 一致来定位拼接点，顶栏变色会让定位失败，故这里关闭该效果。
+    appBarTheme: const AppBarTheme(
+      scrolledUnderElevation: 0,
+      surfaceTintColor: Colors.transparent,
+    ),
   );
 }
 
