@@ -66,8 +66,9 @@ class SharedLedgerBinding {
   /// Copilot 匹配到该账本时用于展示的名称：优先取第一个别名，否则用来源用户名。
   String get displayName => aliases.isNotEmpty ? aliases.first : ownerUsername;
 
-  /// 别名列表展示文案（无别名时为占位符）。
-  String get aliasesLabel => aliases.isEmpty ? '/' : aliases.join('、');
+  /// 别名列表展示文案（无别名时直接用来源用户名）。
+  String get aliasesLabel =>
+      aliases.isEmpty ? ownerUsername : aliases.join('、');
 
   factory SharedLedgerBinding.fromJson(Map<String, Object?> json) {
     final rawId = json['id'];

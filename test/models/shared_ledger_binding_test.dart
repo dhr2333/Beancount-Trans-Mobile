@@ -44,9 +44,8 @@ void main() {
         isEmpty,
       );
       expect(
-        SharedLedgerBinding.fromJson(<String, Object?>{
-          'aliases': null,
-        }).aliases,
+        SharedLedgerBinding.fromJson(<String, Object?>{'aliases': null})
+            .aliases,
         isEmpty,
       );
     });
@@ -100,9 +99,11 @@ void main() {
       expect(binding.displayName, 'alice');
     });
 
-    test('aliasesLabel 无别名时为占位符', () {
-      final binding = SharedLedgerBinding.fromJson(const <String, Object?>{});
-      expect(binding.aliasesLabel, '/');
+    test('aliasesLabel 无别名时回退为来源用户名', () {
+      final binding = SharedLedgerBinding.fromJson(<String, Object?>{
+        'owner_username': 'alice',
+      });
+      expect(binding.aliasesLabel, 'alice');
     });
 
     test('aliasesLabel 用顿号连接', () {
@@ -126,13 +127,19 @@ void main() {
 
     test('读取 has_usable_shared_ledger', () {
       expect(
-        status(apiKey: false, ledger: false, shared: true)
-            .hasUsableSharedLedger,
+        status(
+          apiKey: false,
+          ledger: false,
+          shared: true,
+        ).hasUsableSharedLedger,
         isTrue,
       );
       expect(
-        status(apiKey: false, ledger: false, shared: false)
-            .hasUsableSharedLedger,
+        status(
+          apiKey: false,
+          ledger: false,
+          shared: false,
+        ).hasUsableSharedLedger,
         isFalse,
       );
     });

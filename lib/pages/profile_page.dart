@@ -561,13 +561,15 @@ class _SharedLedgerRow extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '来源用户：${binding.ownerUsername}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.outline,
+                  if (binding.aliases.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      '来源用户：${binding.ownerUsername}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.outline,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
