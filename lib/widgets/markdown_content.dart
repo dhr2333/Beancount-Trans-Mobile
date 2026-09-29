@@ -7,12 +7,20 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 /// 支持标题、列表、表格、行内代码/代码块、引用、分割线、链接（GFM）。
 /// 换行行为与 Web 端 markdown-it 的 `breaks: true` 一致（单个换行即换行）。
 class MarkdownContent extends StatelessWidget {
-  const MarkdownContent({super.key, required this.content, this.baseStyle});
+  const MarkdownContent({
+    super.key,
+    required this.content,
+    this.baseStyle,
+    this.selectable = true,
+  });
 
   final String content;
 
   /// 正文基准样式；标题、代码等在此基础上按比例推导。
   final TextStyle? baseStyle;
+
+  /// 是否允许选中复制；离屏渲染成分享图时传 `false`（无需交互且更省开销）。
+  final bool selectable;
 
   @override
   Widget build(BuildContext context) {
@@ -23,17 +31,17 @@ class MarkdownContent extends StatelessWidget {
     final fontSize = base.fontSize ?? 14;
 
     TextStyle heading(double scale) => base.copyWith(
-          fontSize: fontSize * scale,
-          fontWeight: FontWeight.w600,
-          height: 1.4,
-        );
+      fontSize: fontSize * scale,
+      fontWeight: FontWeight.w600,
+      height: 1.4,
+    );
 
     const headingPadding = EdgeInsets.only(top: 10, bottom: 4);
 
     return MarkdownBody(
       data: content,
-      // 保持与 Web 端一致：回复内容可选中复制
-      selectable: true,
+      // 默认与 Web 端一致：回复内容可选中复制
+      selectable: selectable,
       softLineBreak: true,
       styleSheet: MarkdownStyleSheet(
         p: base,

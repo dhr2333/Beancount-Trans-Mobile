@@ -1,8 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/api_exception.dart';
+import '../../core/share_image.dart';
 import '../../core/sse_client.dart';
 import '../../models/assistant.dart';
 import '../../models/parse_review.dart';
@@ -12,6 +15,7 @@ import '../../services/todo_service.dart';
 import '../../services/translate_service.dart';
 import '../../state/shared_ledger_store.dart';
 import '../../widgets/add_shared_ledger_sheet.dart';
+import '../../widgets/assistant_share_card.dart';
 import '../../widgets/markdown_content.dart';
 import '../../widgets/status_chip.dart';
 import '../fava_page.dart';
@@ -104,6 +108,16 @@ class _AssistantChatPageState extends State<AssistantChatPage>
 
   /// 剪贴板令牌提示弹窗是否正在展示（避免重复弹出）。
   bool _clipboardPrompting = false;
+
+  // ------------------------------------------------------------ 分享图
+  /// 是否处于「生成分享图」的多选模式。
+  bool _shareSelecting = false;
+
+  /// 已选中的待分享助手消息 id（按会话顺序生成分享轮次）。
+  final Set<String> _shareSelectedIds = {};
+
+  /// 是否正在离屏渲染分享图。
+  bool _sharingImage = false;
 
   // ------------------------------------------------------------ 抽屉数据
   List<ChatSessionSummary> _sessions = const [];
@@ -263,6 +277,9 @@ class _AssistantChatPageState extends State<AssistantChatPage>
         _messages
           ..clear()
           ..addAll(messages);
+        // 换会话后旧的分享选择已失效
+        _shareSelecting = false;
+        _shareSelectedIds.clear();
       });
 
       final last = messages.isEmpty ? null : messages.last;
@@ -704,6 +721,9 @@ class _AssistantChatPageState extends State<AssistantChatPage>
       _error = null;
       _sending = false;
       _loading = false;
+      // 新会话没有可分享的历史回复
+      _shareSelecting = false;
+      _shareSelectedIds.clear();
       // 开启新会话时换一组示例问句
       _advanceExamplePage();
     });
@@ -814,6 +834,215 @@ class _AssistantChatPageState extends State<AssistantChatPage>
     return '';
   }
 
+  // ---------------------------------------------------------------- 分享图
+
+  /// 该消息是否可作为分享轮次（仅已完成的助手正文）。
+  bool _canShareMessage(ChatMessage message) =>
+      !message.isUser &&
+      !message.streaming &&
+      !message.localNotice &&
+      !message.isInterrupted &&
+      message.content.trim().isNotEmpty;
+
+  void _enterShareSelect(ChatMessage message) {
+    setState(() {
+      _shareSelecting = true;
+      _shareSelectedIds
+        ..clear()
+        ..add(message.id);
+    });
+  }
+
+  void _exitShareSelect() {
+    setState(() {
+      _shareSelecting = false;
+      _shareSelectedIds.clear();
+    });
+  }
+
+  void _toggleShareSelection(ChatMessage message) {
+    if (!_canShareMessage(message)) return;
+    if (_shareSelectedIds.contains(message.id)) {
+      setState(() => _shareSelectedIds.remove(message.id));
+      return;
+    }
+    if (_shareSelectedIds.length >= kMaxShareTurns) {
+      _notify('最多选择 $kMaxShareTurns 条对话');
+      return;
+    }
+    setState(() => _shareSelectedIds.add(message.id));
+  }
+
+  /// 多选模式下包裹消息气泡：可分享的助手回复可点选，其余置灰不可选。
+  Widget _buildShareSelectionWrapper(ChatMessage message, Widget child) {
+    final theme = Theme.of(context);
+    final selectable = _canShareMessage(message);
+    final selected = _shareSelectedIds.contains(message.id);
+
+    return InkWell(
+      onTap: selectable ? () => _toggleShareSelection(message) : null,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: selected ? theme.colorScheme.primary : Colors.transparent,
+            width: 1.5,
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 20,
+              child: selectable
+                  ? Icon(
+                      selected
+                          ? Icons.check_circle
+                          : Icons.radio_button_unchecked,
+                      size: 20,
+                      color: selected
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.outline,
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Opacity(opacity: selectable ? 1 : 0.5, child: child),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _toggleSelectAllShareable() {
+    final shareable = _messages.where(_canShareMessage).toList();
+    final allSelected =
+        shareable.isNotEmpty &&
+        shareable.every((message) => _shareSelectedIds.contains(message.id));
+    setState(() {
+      _shareSelectedIds.clear();
+      if (allSelected) return;
+      _shareSelectedIds.addAll(
+        shareable.take(kMaxShareTurns).map((message) => message.id),
+      );
+    });
+    if (!allSelected && shareable.length > kMaxShareTurns) {
+      _notify('最多选择 $kMaxShareTurns 条对话');
+    }
+  }
+
+  /// 按会话顺序把选中的助手回复组装成「一问一答」的分享轮次。
+  List<AssistantShareTurn> _buildShareTurns() {
+    final turns = <AssistantShareTurn>[];
+    for (final message in _messages) {
+      if (!_shareSelectedIds.contains(message.id)) continue;
+      if (!_canShareMessage(message)) continue;
+      turns.add(
+        AssistantShareTurn(
+          userMessage: _userMessageBefore(_messages.indexOf(message)),
+          assistantContent: message.content,
+        ),
+      );
+    }
+    return turns;
+  }
+
+  Future<void> _generateShareImage() async {
+    final turns = _buildShareTurns();
+    if (turns.isEmpty) {
+      _notify('请先选择要分享的回复');
+      return;
+    }
+
+    setState(() => _sharingImage = true);
+    Uint8List? bytes;
+    try {
+      bytes = await renderWidgetToPng(
+        context,
+        AssistantShareCard(turns: turns),
+        width: kAssistantShareCardWidth,
+      );
+    } catch (error) {
+      debugPrint('生成分享图失败：$error');
+    } finally {
+      if (mounted) setState(() => _sharingImage = false);
+    }
+
+    if (!mounted) return;
+    if (bytes == null) {
+      _notify('生成分享图失败，请重试');
+      return;
+    }
+
+    final confirmed = await _showSharePreview(bytes, turns.length);
+    if (!mounted || confirmed != true) return;
+
+    try {
+      await sharePngBytes(bytes, fileName: _shareFileName(turns.length));
+      if (mounted) _exitShareSelect();
+    } catch (error) {
+      debugPrint('分享图片失败：$error');
+      if (mounted) _notify('分享失败，请重试');
+    }
+  }
+
+  Future<bool?> _showSharePreview(Uint8List bytes, int turnCount) {
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        insetPadding: const EdgeInsets.all(20),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+              child: Text(
+                '分享图预览（$turnCount 轮对话）',
+                style: Theme.of(dialogContext).textTheme.titleSmall,
+              ),
+            ),
+            Flexible(
+              child: InteractiveViewer(
+                maxScale: 4,
+                child: Image.memory(bytes, fit: BoxFit.contain),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(false),
+                    child: const Text('取消'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: () => Navigator.of(dialogContext).pop(true),
+                    icon: const Icon(Icons.ios_share, size: 18),
+                    label: const Text('分享'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _shareFileName(int turnCount) {
+    final now = DateTime.now();
+    final month = now.month.toString().padLeft(2, '0');
+    final day = now.day.toString().padLeft(2, '0');
+    return 'assistant-${turnCount}turns-${now.year}-$month-$day.png';
+  }
+
   void _notify(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
@@ -849,36 +1078,97 @@ class _AssistantChatPageState extends State<AssistantChatPage>
       onDrawerChanged: (isOpened) {
         if (isOpened) _refreshDrawerData();
       },
-      appBar: AppBar(
-        title: Text(
-          _title.isNotEmpty
-              ? _title
-              : (_sessionId.isEmpty ? '新对话' : 'Copilot 对话'),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        actions: [
-          if (_status != null && !canChat)
-            const Center(
-              child: StatusChip(label: '助手不可用', tone: ChipTone.danger),
-            ),
-          // 新建对话：参考 DeepSeek 移动端放在标题栏右侧
-          IconButton(
-            tooltip: '新对话',
-            onPressed: _onNewChat,
-            icon: const Icon(Icons.add_comment_outlined),
-          ),
-        ],
-      ),
+      appBar: _shareSelecting ? _buildShareAppBar() : _buildChatAppBar(canChat),
       body: _loading && _messages.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
                 if (_error != null) _errorBanner(_error!),
                 Expanded(child: _buildMessageList()),
-                _buildInputBar(canChat),
+                _shareSelecting
+                    ? _buildShareActionBar()
+                    : _buildInputBar(canChat),
               ],
             ),
+    );
+  }
+
+  PreferredSizeWidget _buildChatAppBar(bool canChat) {
+    return AppBar(
+      title: Text(
+        _title.isNotEmpty
+            ? _title
+            : (_sessionId.isEmpty ? '新对话' : 'Copilot 对话'),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      actions: [
+        if (_status != null && !canChat)
+          const Center(
+            child: StatusChip(label: '助手不可用', tone: ChipTone.danger),
+          ),
+        // 新建对话：参考 DeepSeek 移动端放在标题栏右侧
+        IconButton(
+          tooltip: '新对话',
+          onPressed: _onNewChat,
+          icon: const Icon(Icons.add_comment_outlined),
+        ),
+      ],
+    );
+  }
+
+  /// 分享图多选模式的标题栏：显示已选数量，支持全选与退出。
+  PreferredSizeWidget _buildShareAppBar() {
+    return AppBar(
+      leading: IconButton(
+        tooltip: '取消',
+        onPressed: _sharingImage ? null : _exitShareSelect,
+        icon: const Icon(Icons.close),
+      ),
+      title: Text('已选 ${_shareSelectedIds.length} 条'),
+      actions: [
+        TextButton(
+          onPressed: _sharingImage ? null : _toggleSelectAllShareable,
+          child: const Text('全选'),
+        ),
+      ],
+    );
+  }
+
+  /// 多选模式下替换输入栏的操作条。
+  Widget _buildShareActionBar() {
+    final theme = Theme.of(context);
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                '点选要分享的 Copilot 回复，最多 $kMaxShareTurns 条',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.outline,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            FilledButton.icon(
+              onPressed: _sharingImage || _shareSelectedIds.isEmpty
+                  ? null
+                  : _generateShareImage,
+              icon: _sharingImage
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.image_outlined, size: 18),
+              label: const Text('生成图片'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -975,9 +1265,11 @@ class _AssistantChatPageState extends State<AssistantChatPage>
       itemCount: _messages.length,
       itemBuilder: (context, index) {
         final message = _messages[_messages.length - 1 - index];
-        return message.isUser
+        final bubble = message.isUser
             ? _buildUserBubble(message)
             : _buildAssistantBubble(message);
+        if (!_shareSelecting) return bubble;
+        return _buildShareSelectionWrapper(message, bubble);
       },
     );
   }
@@ -1081,7 +1373,8 @@ class _AssistantChatPageState extends State<AssistantChatPage>
           if (!message.streaming &&
               message.content.trim().isNotEmpty &&
               !message.isInterrupted &&
-              !message.localNotice)
+              !message.localNotice &&
+              !_shareSelecting)
             _buildFeedbackRow(message),
         ],
       ),
@@ -1266,6 +1559,16 @@ class _AssistantChatPageState extends State<AssistantChatPage>
             color: message.feedback == 'dislike'
                 ? theme.colorScheme.error
                 : null,
+          ),
+        ),
+        IconButton(
+          tooltip: '生成分享图',
+          visualDensity: VisualDensity.compact,
+          onPressed: () => _enterShareSelect(message),
+          icon: Icon(
+            Icons.ios_share,
+            size: 18,
+            color: theme.colorScheme.outline,
           ),
         ),
       ],
