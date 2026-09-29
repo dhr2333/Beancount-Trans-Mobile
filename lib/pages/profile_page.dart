@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/api_exception.dart';
-import '../core/format.dart';
 import '../models/assistant.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
@@ -181,11 +180,6 @@ class _ProfilePageState extends State<ProfilePage> {
                       value: bindings.username.isEmpty
                           ? '未设置'
                           : bindings.username,
-                    ),
-                    _InfoTile(
-                      icon: Icons.mail_outline,
-                      label: '邮箱',
-                      value: bindings.email.isEmpty ? '未绑定' : bindings.email,
                     ),
                     _InfoTile(
                       icon: Icons.phone_iphone,
@@ -512,7 +506,7 @@ class _WarnTag extends StatelessWidget {
   }
 }
 
-/// 单条共享账本绑定：别名、来源用户、状态、令牌有效期与最后使用时间。
+/// 单条共享账本绑定：别名、来源用户、状态。
 class _SharedLedgerRow extends StatelessWidget {
   const _SharedLedgerRow({required this.binding});
 
@@ -521,14 +515,6 @@ class _SharedLedgerRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final expiresAt = binding.expiresAt.trim();
-    final lastUsedAt = binding.lastUsedAt.trim();
-    final expiresText = expiresAt.isEmpty
-        ? '长期有效'
-        : FormatUtil.dateTime(expiresAt);
-    final lastUsedText = lastUsedAt.isEmpty
-        ? '未使用'
-        : FormatUtil.dateTime(lastUsedAt);
 
     return InkWell(
       onTap: () => showEditSharedLedgerAliasesSheet(
@@ -576,12 +562,6 @@ class _SharedLedgerRow extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     '来源用户：${binding.ownerUsername}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.outline,
-                    ),
-                  ),
-                  Text(
-                    '令牌有效期：$expiresText · 最后使用：$lastUsedText',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.outline,
                     ),
