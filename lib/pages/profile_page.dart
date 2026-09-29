@@ -122,6 +122,10 @@ class _ProfilePageState extends State<ProfilePage> {
     );
     if (confirmed != true) return;
     await AuthStore.instance.logout();
+    if (!mounted) return;
+    // 退栈回到根路由：根路由由 AuthGate 决定，此时已切换为登录页；
+    // 否则「我的」页仍压在栈顶，用户会停在登录态已清空、操作全部失效的页面上。
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   void _notify(String message) {
