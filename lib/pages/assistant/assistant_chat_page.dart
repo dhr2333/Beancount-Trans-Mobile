@@ -1221,7 +1221,7 @@ class _AssistantChatPageState extends State<AssistantChatPage>
           children: [
             Expanded(
               child: Text(
-                '点选要分享的 Copilot 回复，最多 $kMaxShareTurns 条',
+                '点选要分享的 Copilot 回复，最多 $kMaxShareTurns 组',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.outline,
                 ),

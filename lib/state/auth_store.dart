@@ -139,6 +139,37 @@ class AuthStore extends ChangeNotifier {
     await refreshBindings();
   }
 
+  /// 修改用户名：成功后同步本地用户与绑定信息缓存。
+  Future<void> updateUsername(String username) async {
+    final value = username.trim();
+    await AuthService.instance.updateUsername(username: value);
+
+    final current = _user;
+    if (current != null) {
+      _user = AppUser(
+        id: current.id,
+        username: value,
+        email: current.email,
+        phoneNumber: current.phoneNumber,
+      );
+      await TokenStore.instance.saveUser(_user!.toJson());
+    }
+
+    final bindings = _bindings;
+    if (bindings != null) {
+      _bindings = UserBindings(
+        username: value,
+        email: bindings.email,
+        phoneNumber: bindings.phoneNumber,
+        phoneVerified: bindings.phoneVerified,
+        hasPassword: bindings.hasPassword,
+      );
+      await TokenStore.instance.saveBindings(_bindings!.toJson());
+    }
+
+    notifyListeners();
+  }
+
   /// 退出登录：清除待办角标后清空本地令牌。
   ///
   /// 移动端不停止 Fava 实例：实例由服务端按用户管理，且 `/fava/stop/` 可能因

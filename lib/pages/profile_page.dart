@@ -89,6 +89,19 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  Future<void> _openEditUsernameSheet() async {
+    final updated = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _EditUsernameSheet(
+        initialUsername: AuthStore.instance.user?.username ?? '',
+      ),
+    );
+    if (updated == true && mounted) {
+      _notify('用户名修改成功');
+    }
+  }
+
   Future<void> _openFava() async {
     await Navigator.of(context)
         .push(MaterialPageRoute<void>(builder: (_) => const FavaPage()));
@@ -162,9 +175,7 @@ class _ProfilePageState extends State<ProfilePage> {
               children: [
                 _AccountHeader(
                   displayName: displayName,
-                  subtitle: bindings.username.isNotEmpty
-                      ? bindings.username
-                      : bindings.email,
+                  onTap: _openEditUsernameSheet,
                 ),
                 const SizedBox(height: 16),
                 if (_error != null) ...[
@@ -174,13 +185,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 _SectionCard(
                   title: '账号绑定',
                   children: [
-                    _InfoTile(
-                      icon: Icons.person_outline,
-                      label: '用户名',
-                      value: bindings.username.isEmpty
-                          ? '未设置'
-                          : bindings.username,
-                    ),
                     _InfoTile(
                       icon: Icons.phone_iphone,
                       label: '手机号',
@@ -368,48 +372,47 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 }
 
+/// 顶部账号信息：头像 + 账号名，点击可修改用户名。
 class _AccountHeader extends StatelessWidget {
-  const _AccountHeader({required this.displayName, required this.subtitle});
+  const _AccountHeader({required this.displayName, required this.onTap});
 
   final String displayName;
-  final String subtitle;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 26,
-          backgroundColor: theme.colorScheme.primaryContainer,
-          child: Text(
-            displayName.isEmpty
-                ? '?'
-                : displayName.characters.first.toUpperCase(),
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: theme.colorScheme.onPrimaryContainer,
-            ),
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(displayName, style: theme.textTheme.titleMedium),
-              if (subtitle.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.outline,
-                  ),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 26,
+              backgroundColor: theme.colorScheme.primaryContainer,
+              child: Text(
+                displayName.isEmpty
+                    ? '?'
+                    : displayName.characters.first.toUpperCase(),
+                style: theme.textTheme.titleLarge?.copyWith(
+                  color: theme.colorScheme.onPrimaryContainer,
                 ),
-              ],
-            ],
-          ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(displayName, style: theme.textTheme.titleMedium),
+            ),
+            Icon(
+              Icons.edit_outlined,
+              size: 18,
+              color: theme.colorScheme.outline,
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -521,7 +524,6 @@ class _SharedLedgerRow extends StatelessWidget {
         context,
         bindingId: binding.id,
         aliases: binding.aliases,
-        ownerUsername: binding.ownerUsername,
       ),
       borderRadius: BorderRadius.circular(12),
       child: Padding(
@@ -704,6 +706,118 @@ class _ThemeModeSheet extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// 修改用户名弹层：预填当前用户名，校验通过后提交。
+class _EditUsernameSheet extends StatefulWidget {
+  const _EditUsernameSheet({required this.initialUsername});
+
+  final String initialUsername;
+
+  @override
+  State<_EditUsernameSheet> createState() => _EditUsernameSheetState();
+}
+
+class _EditUsernameSheetState extends State<_EditUsernameSheet> {
+  late final TextEditingController _username = TextEditingController(
+    text: widget.initialUsername,
+  );
+
+  bool _submitting = false;
+  String? _error;
+
+  static final RegExp _allowedPattern = RegExp(r'^[a-zA-Z0-9_]+$');
+
+  @override
+  void dispose() {
+    _username.dispose();
+    super.dispose();
+  }
+
+  String? _validate(String value) {
+    if (value.isEmpty) return '请输入用户名';
+    if (value.length < 3 || value.length > 150) return '用户名长度为 3-150 个字符';
+    if (!_allowedPattern.hasMatch(value)) return '用户名只能包含字母、数字和下划线';
+    return null;
+  }
+
+  Future<void> _submit() async {
+    final value = _username.text.trim();
+    final invalid = _validate(value);
+    if (invalid != null) {
+      setState(() => _error = invalid);
+      return;
+    }
+    if (value == widget.initialUsername) {
+      Navigator.of(context).pop(false);
+      return;
+    }
+    setState(() {
+      _error = null;
+      _submitting = true;
+    });
+    try {
+      await AuthStore.instance.updateUsername(value);
+      if (mounted) Navigator.of(context).pop(true);
+    } on ApiException catch (error) {
+      if (mounted) {
+        setState(() => _error = error.fieldErrors['username'] ?? error.message);
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomInset),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('修改用户名', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(
+            '3-150 个字符，仅支持字母、数字和下划线。',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.outline,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _username,
+            autofocus: true,
+            autocorrect: false,
+            enableSuggestions: false,
+            decoration: InputDecoration(
+              labelText: '用户名',
+              border: const OutlineInputBorder(),
+              errorText: _error,
+            ),
+            onSubmitted: (_) => _submit(),
+          ),
+          const SizedBox(height: 18),
+          FilledButton(
+            onPressed: _submitting ? null : _submit,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(46),
+            ),
+            child: _submitting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('保存'),
+          ),
+        ],
       ),
     );
   }

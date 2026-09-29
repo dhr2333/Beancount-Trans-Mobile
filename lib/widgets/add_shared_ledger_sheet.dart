@@ -118,14 +118,6 @@ class _AddSharedLedgerSheetState extends State<_AddSharedLedgerSheet> {
                 color: theme.colorScheme.outline,
               ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              '令牌由对方在「个人设置 → 访问令牌」生成，仅具账本只读权限；'
-              '建议每次分享单独创建一个令牌，需要收回访问时由对方撤销该令牌。',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.outline,
-              ),
-            ),
             const SizedBox(height: 16),
             TextField(
               controller: _token,
@@ -192,16 +184,12 @@ Future<bool?> showEditSharedLedgerAliasesSheet(
   BuildContext context, {
   required int bindingId,
   required List<String> aliases,
-  required String ownerUsername,
 }) {
   return showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
-    builder: (_) => _EditSharedLedgerAliasesSheet(
-      bindingId: bindingId,
-      aliases: aliases,
-      ownerUsername: ownerUsername,
-    ),
+    builder: (_) =>
+        _EditSharedLedgerAliasesSheet(bindingId: bindingId, aliases: aliases),
   );
 }
 
@@ -210,12 +198,10 @@ class _EditSharedLedgerAliasesSheet extends StatefulWidget {
   const _EditSharedLedgerAliasesSheet({
     required this.bindingId,
     required this.aliases,
-    required this.ownerUsername,
   });
 
   final int bindingId;
   final List<String> aliases;
-  final String ownerUsername;
 
   @override
   State<_EditSharedLedgerAliasesSheet> createState() =>
@@ -287,13 +273,6 @@ class _EditSharedLedgerAliasesSheetState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('编辑别名', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 6),
-            Text(
-              '来源用户：${widget.ownerUsername}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.outline,
-              ),
-            ),
             const SizedBox(height: 6),
             Text(
               '别名可留空，也可填多个（用逗号、顿号或空格分隔）；'

@@ -85,6 +85,14 @@ class AuthService {
         : const UserBindings();
   }
 
+  /// 修改用户名。
+  Future<void> updateUsername({required String username}) async {
+    await _client.patch<Object?>(
+      '/auth/profile/update_me/',
+      data: {'username': username},
+    );
+  }
+
   /// 绑定手机号。
   Future<String> bindPhone({
     required String phoneNumber,
