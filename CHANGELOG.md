@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.1](https://github.com/dhr2333/Beancount-Trans-Mobile/compare/1.2.0...1.2.1) (2026-09-29)
+
+### Bug Fixes
+
+* **auth:** 移除登出时停止Fava实例的逻辑，更新相关提示与文档 ([dd738d5](https://github.com/dhr2333/Beancount-Trans-Mobile/commit/dd738d54d2e0f62a48f5c038fc5ed50dca9f2f5d))
+* **profile_page:** 修复个人页面登出后的导航逻辑问题 ([df762c3](https://github.com/dhr2333/Beancount-Trans-Mobile/commit/df762c353f579b27b20743bd233be072d8d04656))
+* **shared-ledger:** 添加共享账本别名编辑功能 ([3fd8182](https://github.com/dhr2333/Beancount-Trans-Mobile/commit/3fd8182da03b5fbb6634ecaf260e08d93984193b))
+* **theme:** 修复AppBar滚动变色问题并重构主题构建代码 ([100d467](https://github.com/dhr2333/Beancount-Trans-Mobile/commit/100d46734023b6eb0825a93ebf70ff79263eb1d1))
+* 优化共享账本别名标签与页面展示逻辑 ([78f11ba](https://github.com/dhr2333/Beancount-Trans-Mobile/commit/78f11bafdd4fe62449f6772e3d65e8e42e32120f))
+* 实现完整的应用内更新功能 ([5c59e2f](https://github.com/dhr2333/Beancount-Trans-Mobile/commit/5c59e2f6f72e6243f64bf57a2da07bf7f0009282))
+* 页面优化 ([36ba06f](https://github.com/dhr2333/Beancount-Trans-Mobile/commit/36ba06ffa351b282853dc9682821dd5f5d9b782e))
+
 ## [1.2.0](https://github.com/dhr2333/Beancount-Trans-Mobile/compare/1.1.0...1.2.0) (2026-09-27)
 
 ### Features
