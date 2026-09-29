@@ -65,8 +65,55 @@ void main() {
     });
 
     testWidgets('超长内容不抛异常（避免流式文本解析崩溃）', (tester) async {
-      await _pump(tester, List.generate(200, (i) => '- 第 $i 行 **加粗**').join('\n'));
+      await _pump(
+        tester,
+        List.generate(200, (i) => '- 第 $i 行 **加粗**').join('\n'),
+      );
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('表格短列按内容宽度固定，长列占剩余宽度并换行', (tester) async {
+      const table = '''
+| 账户 | 金额 | 说明 |
+| --- | --- | --- |
+| 餐饮 | 1200 | 本月聚餐三次包含一次团建所以说明文本明显比其它单元格都要长 |
+''';
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 360,
+                child: SingleChildScrollView(
+                  child: MarkdownContent(content: table),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+
+      double cellWidth(String text) => tester
+          .getSize(
+            find.byWidgetPredicate(
+              (widget) =>
+                  widget is EditableText && widget.controller.text == text,
+            ),
+          )
+          .width;
+
+      final amountWidth = cellWidth('1200');
+      final noteWidth = cellWidth('本月聚餐三次包含一次团建所以说明文本明显比其它单元格都要长');
+
+      // 等宽布局下每列 360 / 3 = 120（单元格去掉左右各 10 内边距后为 100）：
+      // 短列应按内容宽度收窄，长列应吃掉剩余宽度而不再被挤压
+      expect(amountWidth, lessThan(90));
+      expect(noteWidth, greaterThan(150));
+      expect(amountWidth, lessThan(noteWidth));
+      expect(tester.getSize(find.byType(Table)).width, lessThanOrEqualTo(360));
     });
   });
 }

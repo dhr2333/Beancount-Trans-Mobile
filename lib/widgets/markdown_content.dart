@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
@@ -86,6 +89,9 @@ class MarkdownContent extends StatelessWidget {
         tableBody: base,
         tableHeadAlign: TextAlign.left,
         tableBorder: TableBorder.all(color: scheme.outlineVariant),
+        // 短列（金额、日期等）按内容宽度固定，长文本列吃掉剩余宽度并换行，
+        // 避免默认的等宽列把长列挤窄（默认值 FlexColumnWidth 即所有列等宽）
+        tableColumnWidth: const _AdaptiveTableColumnWidth(),
         tableCellsPadding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
         tableHeadCellsDecoration: BoxDecoration(
           color: scheme.surfaceContainerHighest,
@@ -116,4 +122,47 @@ class MarkdownContent extends StatelessWidget {
         ),
       );
   }
+}
+
+/// 自适应表格列宽：内容窄的列按内容宽度固定，内容宽的列吃掉剩余宽度并自动换行。
+///
+/// 对齐 Web 端表格观感（短列不挤压长列、长列在可用宽度内换行，无需横向滚动）。
+/// 取值依据 [RenderTable] 的 `_computeColumnWidths`：
+/// 短列 min=max=内容宽度且不参与弹性分配 → 既不被压缩也不抢宽度；
+/// 长列 flex=1、下限为最小内容宽度 → 吸收剩余宽度、放不下时换行。
+class _AdaptiveTableColumnWidth extends TableColumnWidth {
+  const _AdaptiveTableColumnWidth();
+
+  /// 自然宽度不超过该值的列视为「短列」（如金额、日期、状态）。
+  static const double _shortColumnMaxWidth = 120;
+
+  static double _naturalWidth(Iterable<RenderBox> cells) {
+    var width = 0.0;
+    for (final cell in cells) {
+      width = math.max(width, cell.getMaxIntrinsicWidth(double.infinity));
+    }
+    return width;
+  }
+
+  static double _minContentWidth(Iterable<RenderBox> cells) {
+    var width = 0.0;
+    for (final cell in cells) {
+      width = math.max(width, cell.getMinIntrinsicWidth(double.infinity));
+    }
+    return width;
+  }
+
+  static bool _isShortColumn(Iterable<RenderBox> cells) =>
+      _naturalWidth(cells) <= _shortColumnMaxWidth;
+
+  @override
+  double maxIntrinsicWidth(Iterable<RenderBox> cells, double containerWidth) =>
+      _naturalWidth(cells);
+
+  @override
+  double minIntrinsicWidth(Iterable<RenderBox> cells, double containerWidth) =>
+      _isShortColumn(cells) ? _naturalWidth(cells) : _minContentWidth(cells);
+
+  @override
+  double? flex(Iterable<RenderBox> cells) => _isShortColumn(cells) ? null : 1;
 }
