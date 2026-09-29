@@ -107,7 +107,7 @@ class _ProfilePageState extends State<ProfilePage> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('退出登录'),
-        content: const Text('退出后将清除本地登录状态，并停止当前 Fava 实例。'),
+        content: const Text('退出后将清除本地登录状态。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),

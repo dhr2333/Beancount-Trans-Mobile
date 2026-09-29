@@ -6,7 +6,6 @@ import '../core/token_store.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 import '../services/badge_service.dart';
-import '../services/fava_service.dart';
 
 enum AuthStatus { unknown, loggedOut, loggedIn }
 
@@ -140,13 +139,11 @@ class AuthStore extends ChangeNotifier {
     await refreshBindings();
   }
 
-  /// 退出登录：先停止 Fava 实例与待办角标，再清空本地令牌。
+  /// 退出登录：清除待办角标后清空本地令牌。
+  ///
+  /// 移动端不停止 Fava 实例：实例由服务端按用户管理，且 `/fava/stop/` 可能因
+  /// `docker stop` 耗时数秒，会拖慢退出登录、让用户误以为没有响应。
   Future<void> logout() async {
-    try {
-      await FavaService.instance.stopFava();
-    } catch (_) {
-      // 停止实例失败不影响退出登录
-    }
     await BadgeService.instance.clear();
     await TokenStore.instance.clear();
     _user = null;
