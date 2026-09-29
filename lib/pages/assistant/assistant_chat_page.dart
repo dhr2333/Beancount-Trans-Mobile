@@ -119,6 +119,13 @@ class _AssistantChatPageState extends State<AssistantChatPage>
   /// 是否正在离屏渲染分享图。
   bool _sharingImage = false;
 
+  // ------------------------------------------------------------ 编辑提问
+  /// 正在就地编辑的用户消息 id（`null` 表示当前没有在编辑）。
+  String? _editingMessageId;
+
+  /// 编辑提问时的草稿。
+  final TextEditingController _editInput = TextEditingController();
+
   // ------------------------------------------------------------ 抽屉数据
   List<ChatSessionSummary> _sessions = const [];
   bool _drawerLoading = false;
@@ -144,6 +151,7 @@ class _AssistantChatPageState extends State<AssistantChatPage>
     SharedLedgerStore.instance.removeListener(_onSharedLedgerChanged);
     _cancelToken?.cancel();
     _input.dispose();
+    _editInput.dispose();
     _sessionSearch.dispose();
     _scroll.dispose();
     super.dispose();
@@ -277,9 +285,10 @@ class _AssistantChatPageState extends State<AssistantChatPage>
         _messages
           ..clear()
           ..addAll(messages);
-        // 换会话后旧的分享选择已失效
+        // 换会话后旧的分享选择与编辑草稿都已失效
         _shareSelecting = false;
         _shareSelectedIds.clear();
+        _editingMessageId = null;
       });
 
       final last = messages.isEmpty ? null : messages.last;
@@ -444,9 +453,30 @@ class _AssistantChatPageState extends State<AssistantChatPage>
     }
   }
 
-  Future<void> _send({String? retryText, bool appendUser = true}) async {
+  Future<void> _send({
+    String? retryText,
+    bool appendUser = true,
+    String? editMessageId,
+  }) async {
     final text = (retryText ?? _input.text).trim();
     if (text.isEmpty || _sending) return;
+
+    if (editMessageId != null) {
+      // 与 Web 端一致：截断该提问之后的消息并就地改写提问内容，
+      // 由后端按 `edit_message_id` 重新生成，避免留下同一提问的两份记录。
+      final index = _messages.indexWhere((item) => item.id == editMessageId);
+      if (index < 0 || !_messages[index].isUser) {
+        _notify('要编辑的消息不存在');
+        return;
+      }
+      setState(() {
+        _messages.removeRange(index + 1, _messages.length);
+        _messages[index].content = text;
+        _editingMessageId = null;
+        _shareSelecting = false;
+        _shareSelectedIds.clear();
+      });
+    }
 
     // 发送即收起键盘：输入框保留焦点会让键盘一直占屏，需额外点按才会消失
     FocusManager.instance.primaryFocus?.unfocus();
@@ -478,6 +508,7 @@ class _AssistantChatPageState extends State<AssistantChatPage>
       await AssistantService.instance.sendStream(
         content: text,
         sessionId: _sessionId.isEmpty ? null : _sessionId,
+        editMessageId: editMessageId,
         deepThink: _deepThink,
         cancelToken: _cancelToken,
         onEvent: _handleEvent,
@@ -519,16 +550,58 @@ class _AssistantChatPageState extends State<AssistantChatPage>
     }
   }
 
-  /// 重试被中断的回复：移除空回复后重发上一条提问。
-  Future<void> _retry(ChatMessage message) async {
+  /// 该用户提问是否可编辑/重发（已持久化并拿到了服务端 id）。
+  bool _canEditUserMessage(ChatMessage message) =>
+      message.isUser &&
+      message.id.isNotEmpty &&
+      !message.id.startsWith('local-') &&
+      _sessionId.isNotEmpty;
+
+  /// 重新生成：用同一条提问再发一次，由后端按 `edit_message_id` 丢弃后续消息并重新生成。
+  Future<void> _retryAssistant(ChatMessage message) async {
+    if (_sending || _shareSelecting) return;
     final index = _messages.indexOf(message);
-    final text = index < 0 ? '' : _userMessageBefore(index).trim();
-    if (text.isEmpty) {
-      _notify('未找到可重试的提问');
+    for (var i = index - 1; i >= 0; i -= 1) {
+      final candidate = _messages[i];
+      if (candidate.isUser && _canEditUserMessage(candidate)) {
+        await _send(
+          retryText: candidate.content,
+          appendUser: false,
+          editMessageId: candidate.id,
+        );
+        return;
+      }
+    }
+    _notify('找不到可重新生成的提问');
+  }
+
+  void _startEditUserMessage(ChatMessage message) {
+    if (_sending || _shareSelecting) return;
+    if (!_canEditUserMessage(message)) {
+      _notify('当前会话尚未保存，无法编辑历史提问');
       return;
     }
-    setState(() => _messages.removeAt(index));
-    await _send(retryText: text, appendUser: false);
+    final text = message.content;
+    setState(() {
+      _editingMessageId = message.id;
+      _editInput.text = text;
+      _editInput.selection = TextSelection.collapsed(offset: text.length);
+    });
+  }
+
+  void _cancelEditUserMessage() {
+    setState(() => _editingMessageId = null);
+  }
+
+  Future<void> _submitEditUserMessage() async {
+    final messageId = _editingMessageId;
+    if (messageId == null) return;
+    final text = _editInput.text.trim();
+    if (text.isEmpty) {
+      _notify('提问内容不能为空');
+      return;
+    }
+    await _send(retryText: text, appendUser: false, editMessageId: messageId);
   }
 
   Future<void> _reconnect(String assistantMessageId) async {
@@ -721,9 +794,10 @@ class _AssistantChatPageState extends State<AssistantChatPage>
       _error = null;
       _sending = false;
       _loading = false;
-      // 新会话没有可分享的历史回复
+      // 新会话没有可分享的历史回复，也没有在编辑的提问
       _shareSelecting = false;
       _shareSelectedIds.clear();
+      _editingMessageId = null;
       // 开启新会话时换一组示例问句
       _advanceExamplePage();
     });
@@ -847,6 +921,7 @@ class _AssistantChatPageState extends State<AssistantChatPage>
   void _enterShareSelect(ChatMessage message) {
     setState(() {
       _shareSelecting = true;
+      _editingMessageId = null;
       _shareSelectedIds
         ..clear()
         ..add(message.id);
@@ -1276,6 +1351,13 @@ class _AssistantChatPageState extends State<AssistantChatPage>
 
   Widget _buildUserBubble(ChatMessage message) {
     final theme = Theme.of(context);
+    final editing = _editingMessageId == message.id;
+    final canEdit =
+        _canEditUserMessage(message) && !_sending && !_shareSelecting;
+    final textStyle = theme.textTheme.bodyMedium?.copyWith(
+      color: theme.colorScheme.onPrimaryContainer,
+    );
+
     return Align(
       alignment: Alignment.centerRight,
       child: Container(
@@ -1288,12 +1370,45 @@ class _AssistantChatPageState extends State<AssistantChatPage>
           color: theme.colorScheme.primaryContainer,
           borderRadius: BorderRadius.circular(14),
         ),
-        child: SelectableText(
-          message.content,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onPrimaryContainer,
-          ),
-        ),
+        child: editing
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: _editInput,
+                    minLines: 2,
+                    maxLines: 8,
+                    autofocus: true,
+                    style: textStyle,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      border: InputBorder.none,
+                      hintText: '修改后重新发送',
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: _sending ? null : _cancelEditUserMessage,
+                        child: const Text('取消'),
+                      ),
+                      const SizedBox(width: 4),
+                      FilledButton(
+                        onPressed: _sending ? null : _submitEditUserMessage,
+                        child: const Text('重新发送'),
+                      ),
+                    ],
+                  ),
+                ],
+              )
+            // 点击已发送的提问即可就地编辑并重新发送
+            : InkWell(
+                onTap: canEdit ? () => _startEditUserMessage(message) : null,
+                child: Text(message.content, style: textStyle),
+              ),
       ),
     );
   }
@@ -1365,7 +1480,7 @@ class _AssistantChatPageState extends State<AssistantChatPage>
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: TextButton.icon(
-                onPressed: _sending ? null : () => _retry(message),
+                onPressed: _sending ? null : () => _retryAssistant(message),
                 icon: const Icon(Icons.refresh, size: 16),
                 label: const Text('重试'),
               ),
@@ -1560,6 +1675,12 @@ class _AssistantChatPageState extends State<AssistantChatPage>
                 ? theme.colorScheme.error
                 : null,
           ),
+        ),
+        IconButton(
+          tooltip: '重新生成',
+          visualDensity: VisualDensity.compact,
+          onPressed: _sending ? null : () => _retryAssistant(message),
+          icon: Icon(Icons.refresh, size: 18, color: theme.colorScheme.outline),
         ),
         IconButton(
           tooltip: '生成分享图',
