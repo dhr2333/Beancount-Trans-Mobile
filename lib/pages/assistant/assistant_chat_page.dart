@@ -1317,16 +1317,6 @@ class _AssistantChatPageState extends State<AssistantChatPage>
                 enabled: canChat,
                 onSelect: _onExampleSelected,
               ),
-              if (!canChat) ...[
-                const SizedBox(height: 12),
-                Text(
-                  '向 Copilot 提问你的账本',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.outline,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
             ],
           ),
         ),
