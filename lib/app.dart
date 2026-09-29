@@ -32,19 +32,25 @@ class BeancountTransApp extends StatelessWidget {
     );
   }
 
-  static ThemeData _buildTheme(Brightness brightness) => ThemeData(
-    useMaterial3: true,
-    colorSchemeSeed: _brandSeed,
-    brightness: brightness,
-    // 顶栏在滚动时保持配色稳定：Material 3 默认给 AppBar 设了
-    // scrolledUnderElevation=3，内容滚到标题栏下方时会叠加一层 surfaceTint，
-    // 表现为「下拉时顶部变色」。系统滚动截屏（长截图）靠相邻两帧中固定区域
-    // 一致来定位拼接点，顶栏变色会让定位失败，故这里关闭该效果。
-    appBarTheme: const AppBarTheme(
-      scrolledUnderElevation: 0,
-      surfaceTintColor: Colors.transparent,
-    ),
-  );
+  static ThemeData _buildTheme(Brightness brightness) {
+    final ColorScheme scheme = ColorScheme.fromSeed(
+      seedColor: _brandSeed,
+      brightness: brightness,
+    );
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: scheme,
+      // 顶栏固定用页面底色：Material 3 在内容滚到 AppBar 下方时会直接把背景换成
+      // surfaceContainer（与 elevation 无关，scrolledUnderElevation=0 拦不住），
+      // 表现为「下拉变色」。显式指定 backgroundColor 后，静止与滚动两种状态都用
+      // 同一个颜色，长截图拼接时顶部区域也就稳定了。
+      appBarTheme: AppBarTheme(
+        backgroundColor: scheme.surface,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+      ),
+    );
+  }
 }
 
 /// 认证门：启动中 → 启动页；未登录 → 登录页；已登录 → Copilot 对话页。
