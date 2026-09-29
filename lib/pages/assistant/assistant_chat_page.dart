@@ -431,6 +431,9 @@ class _AssistantChatPageState extends State<AssistantChatPage>
     final text = (retryText ?? _input.text).trim();
     if (text.isEmpty || _sending) return;
 
+    // 发送即收起键盘：输入框保留焦点会让键盘一直占屏，需额外点按才会消失
+    FocusManager.instance.primaryFocus?.unfocus();
+
     final requestId = ++_activeRequestId;
 
     setState(() {
