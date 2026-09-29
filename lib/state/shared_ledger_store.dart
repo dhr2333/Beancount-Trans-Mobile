@@ -68,6 +68,15 @@ class SharedLedgerStore extends ChangeNotifier {
     await _rememberFingerprint(accessTokenFingerprint(token));
   }
 
+  /// 更新某条共享账本的别名；[ApiException] 向上抛出，由表单展示 `error.message`。
+  Future<void> updateAliases({
+    required int id,
+    required List<String> aliases,
+  }) async {
+    await SharedLedgerService.instance.updateAliases(id: id, aliases: aliases);
+    await refresh();
+  }
+
   /// 读取剪贴板中的访问令牌；未命中或已提示过则返回 `null`。
   ///
   /// 命中后**先记录指纹再返回**（同一条令牌只提醒一次，用户忽略后不再打扰）。

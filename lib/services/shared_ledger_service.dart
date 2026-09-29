@@ -3,7 +3,7 @@ import '../models/assistant.dart';
 
 /// 共享账本服务，对应后端 `/api/assistant/shared-ledgers/`。
 ///
-/// 只提供列表与添加；**不实现解绑**（移动端不提供解绑能力）。
+/// 只提供列表、添加与别名更新；**不实现解绑**（移动端不提供解绑能力）。
 class SharedLedgerService {
   SharedLedgerService._();
 
@@ -30,6 +30,21 @@ class SharedLedgerService {
     final response = await _client.post<Object?>(
       '/assistant/shared-ledgers/',
       data: {'token': token, 'aliases': aliases},
+    );
+    final data = response.data;
+    return data is Map
+        ? SharedLedgerBinding.fromJson(data.cast<String, Object?>())
+        : const SharedLedgerBinding();
+  }
+
+  /// `PATCH /assistant/shared-ledgers/{id}/`，整体覆盖别名并返回更新后的绑定。
+  Future<SharedLedgerBinding> updateAliases({
+    required int id,
+    required List<String> aliases,
+  }) async {
+    final response = await _client.patch<Object?>(
+      '/assistant/shared-ledgers/$id/',
+      data: {'aliases': aliases},
     );
     final data = response.data;
     return data is Map
