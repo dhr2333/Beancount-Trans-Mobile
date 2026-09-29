@@ -102,7 +102,7 @@ void main() {
 
     test('aliasesLabel 无别名时为占位符', () {
       final binding = SharedLedgerBinding.fromJson(const <String, Object?>{});
-      expect(binding.aliasesLabel, '—');
+      expect(binding.aliasesLabel, '/');
     });
 
     test('aliasesLabel 用顿号连接', () {

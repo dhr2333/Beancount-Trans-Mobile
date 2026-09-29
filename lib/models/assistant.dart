@@ -67,7 +67,7 @@ class SharedLedgerBinding {
   String get displayName => aliases.isNotEmpty ? aliases.first : ownerUsername;
 
   /// 别名列表展示文案（无别名时为占位符）。
-  String get aliasesLabel => aliases.isEmpty ? '—' : aliases.join('、');
+  String get aliasesLabel => aliases.isEmpty ? '/' : aliases.join('、');
 
   factory SharedLedgerBinding.fromJson(Map<String, Object?> json) {
     final rawId = json['id'];
