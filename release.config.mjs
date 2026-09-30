@@ -1,9 +1,11 @@
 // Beancount-Trans-Mobile 语义化发布配置（plain ESM，不依赖 ts-node）。
-// prepare 阶段会用发布版本号构建已签名 APK，publish 阶段把 APK 作为 Release 附件上传。
-// 版本号形如 <semver>-<main 提交数>（如 1.2.1-51），由本地插件 ci/release-version.mjs 接管计算：
-//   前缀只在 feat / fix / BREAKING CHANGE 时抬高，后缀每次 main 提交都 +1；
-//   tag 直接使用该版本号（如 1.2.1-51）。
-import releaseVersion from './ci/release-version.mjs';
+//
+// 只负责「正式发布」：按 conventional commits 计算语义化版本（feat → minor、fix → patch、
+// BREAKING CHANGE → major，其它提交不发布），打 tag、写 CHANGELOG、建 GitHub Release，
+// 并把 prepare 阶段用该版本重新构建的已签名 APK 作为 Release 附件上传。
+//
+// 「每次提交都能更新」由独立的滚动构建通道承担（见 ci/publish_latest_release.mjs）：
+// 每次 main 构建都会把 APK 发到固定 tag 的 Release，应用内更新读它。
 
 /** @type {import('semantic-release').GlobalConfig} */
 export default {
@@ -11,9 +13,8 @@ export default {
   repositoryUrl: 'https://github.com/dhr2333/Beancount-Trans-Mobile',
   tagFormat: '${version}',
   plugins: [
-    // 本地插件接管版本计算，因此不再使用 @semantic-release/commit-analyzer
-    // （否则它会把“只有发布提交”的情况也算作可发布，导致发布提交反复触发发版）
-    releaseVersion,
+    // @semantic-release/commit-analyzer 是 semantic-release 自带的依赖，无需在 package.json 声明
+    ['@semantic-release/commit-analyzer', { preset: 'conventionalcommits' }],
     [
       '@semantic-release/release-notes-generator',
       {

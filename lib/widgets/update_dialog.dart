@@ -134,7 +134,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
   /// [skipped] 为 true 表示用户选择「稍后」，本次版本不再自动提醒。
   Future<void> _close({bool skipped = false}) async {
     if (skipped) {
-      await UpdateService.instance.skipVersion(widget.info.latestVersion);
+      await UpdateService.instance.skipVersion(widget.info.latestBuild);
     }
     if (mounted) Navigator.of(context).pop();
   }

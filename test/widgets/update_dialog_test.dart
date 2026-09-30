@@ -9,6 +9,7 @@ void main() {
   final info = UpdateInfo(
     currentVersion: '1.0.0',
     latestVersion: '1.1.0',
+    latestBuild: 10100,
     notes:
         '## 新特性\n\n- 支持应用内更新\n\n```\nflutter build apk\n```\n\n'
         '${'很长的更新说明段落。' * 60}',

@@ -114,7 +114,7 @@ class _UpdateGateState extends State<UpdateGate> {
       final info = await UpdateService.instance.checkForUpdate();
       if (info == null || !mounted) return;
       // 用户点过「稍后」的版本不再自动提醒（手动检查不受此限制）
-      if (await UpdateService.instance.isVersionSkipped(info.latestVersion)) {
+      if (await UpdateService.instance.isVersionSkipped(info.latestBuild)) {
         return;
       }
       if (!mounted) return;

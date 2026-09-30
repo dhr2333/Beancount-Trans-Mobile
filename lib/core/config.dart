@@ -29,4 +29,10 @@ class ApiConfig {
     'RELEASE_REPO',
     defaultValue: 'dhr2333/Beancount-Trans-Mobile',
   );
+
+  /// 滚动构建 Release 的固定 tag：每次 main 提交都会更新它，应用内更新读它。
+  static const String latestReleaseTag = String.fromEnvironment(
+    'RELEASE_TAG',
+    defaultValue: 'latest',
+  );
 }
