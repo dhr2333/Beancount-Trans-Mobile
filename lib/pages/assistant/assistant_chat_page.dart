@@ -69,6 +69,9 @@ const List<String> kExampleQuestions = [
 /// 首页示例问句一次展示的条数。
 const int _kExampleWindow = 4;
 
+/// 判定滚动位置是否「贴着底部」的像素容差（超出即视为用户在看历史）。
+const double _kStickThreshold = 48;
+
 /// Copilot 对话页：消息流 + SSE 流式生成。
 ///
 /// 事件处理状态机照搬 Web 端
@@ -99,6 +102,9 @@ class _AssistantChatPageState extends State<AssistantChatPage>
   bool _loading = true;
   bool _sending = false;
   bool _deepThink = false;
+
+  /// 消息列表是否贴着底部：用户上滑看历史后不再自动跟随新内容（与 Web 端一致）。
+  bool _stickToBottom = true;
 
   /// 账单上传解析中（上传/解析期间禁用附件按钮）。
   bool _uploading = false;
@@ -141,6 +147,7 @@ class _AssistantChatPageState extends State<AssistantChatPage>
     super.initState();
     _sessionId = widget.sessionId ?? '';
     WidgetsBinding.instance.addObserver(this);
+    _scroll.addListener(_onChatScroll);
     SharedLedgerStore.instance.addListener(_onSharedLedgerChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
   }
@@ -153,8 +160,27 @@ class _AssistantChatPageState extends State<AssistantChatPage>
     _input.dispose();
     _editInput.dispose();
     _sessionSearch.dispose();
+    _scroll.removeListener(_onChatScroll);
     _scroll.dispose();
     super.dispose();
+  }
+
+  /// 记录滚动位置是否仍贴着底部（供内容变化后决定是否自动跟随）。
+  void _onChatScroll() {
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    _stickToBottom =
+        position.maxScrollExtent - position.pixels <= _kStickThreshold;
+  }
+
+  /// 内容变化后主动跟随到底部（列表为正序贴顶，不再像反向列表那样自动贴底）；
+  /// 仅在用户本就贴着底部时执行，避免打断翻看历史的操作。
+  void _scheduleStickyScroll() {
+    if (!_stickToBottom) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scroll.hasClients) return;
+      _scroll.jumpTo(_scroll.position.maxScrollExtent);
+    });
   }
 
   /// 共享账本变化（加载完成 / 新添加）时刷新来源标注。
@@ -170,6 +196,12 @@ class _AssistantChatPageState extends State<AssistantChatPage>
       _refreshDrawerData();
       _maybePromptClipboardToken();
     }
+  }
+
+  /// 视口尺寸变化（如弹出/收起键盘）后重新贴底，避免最新一条被裁掉。
+  @override
+  void didChangeMetrics() {
+    _scheduleStickyScroll();
   }
 
   Future<void> _bootstrap() async {
@@ -290,6 +322,8 @@ class _AssistantChatPageState extends State<AssistantChatPage>
         _shareSelectedIds.clear();
         _editingMessageId = null;
       });
+      _stickToBottom = true;
+      _scheduleStickyScroll();
 
       final last = messages.isEmpty ? null : messages.last;
       if (last != null && last.streaming && last.id.isNotEmpty) {
@@ -308,6 +342,7 @@ class _AssistantChatPageState extends State<AssistantChatPage>
   void _handleEvent(SseEvent event) {
     if (!mounted) return;
     setState(() => _applyEvent(event));
+    _scheduleStickyScroll();
   }
 
   void _applyEvent(SseEvent event) {
@@ -498,8 +533,10 @@ class _AssistantChatPageState extends State<AssistantChatPage>
       );
       _sending = true;
       _error = null;
+      _stickToBottom = true;
       _input.clear();
     });
+    _scheduleStickyScroll();
 
     _cancelToken?.cancel();
     _cancelToken = CancelToken();
@@ -759,6 +796,7 @@ class _AssistantChatPageState extends State<AssistantChatPage>
         ),
       );
     });
+    _scheduleStickyScroll();
   }
 
   // ---------------------------------------------------------------- 抽屉
@@ -1325,11 +1363,10 @@ class _AssistantChatPageState extends State<AssistantChatPage>
 
     return ListView.builder(
       controller: _scroll,
-      reverse: true,
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
       itemCount: _messages.length,
       itemBuilder: (context, index) {
-        final message = _messages[_messages.length - 1 - index];
+        final message = _messages[index];
         final bubble = message.isUser
             ? _buildUserBubble(message)
             : _buildAssistantBubble(message);
