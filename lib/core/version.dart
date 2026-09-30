@@ -3,8 +3,12 @@
 /// 支持 `1.2.3`、`v1.2.3`、`1.2.3+build`、`1.2.3-rc.1` 等写法：
 /// 忽略前导 `v` 与构建号（`+` 之后），保留预发布标识参与比较。
 /// 缺失的段位按 0 处理，因此 `1.2` 与 `1.2.0` 等价。
+/// 纯数字的预发布标识（`1.2.1-50`）在本项目中是构建后缀（见 ci/release-version.mjs），
+/// 因此同前缀下按构建号比大小，且高于无后缀的 `1.2.1`。
 class AppVersion implements Comparable<AppVersion> {
   const AppVersion(this.major, this.minor, this.patch, [this.preRelease = '']);
+
+  static final RegExp _digits = RegExp(r'^\d+$');
 
   final int major;
   final int minor;
@@ -22,9 +26,8 @@ class AppVersion implements Comparable<AppVersion> {
         .replaceFirst(RegExp(r'^[vV]'), '')
         .split('+')
         .first;
-    final match = RegExp(
-      r'^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-(.+))?$',
-    ).firstMatch(normalized);
+    final match = RegExp(r'^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-(.+))?$')
+        .firstMatch(normalized);
     if (match == null) return null;
     return AppVersion(
       int.parse(match.group(1)!),
@@ -36,6 +39,12 @@ class AppVersion implements Comparable<AppVersion> {
 
   bool get isPreRelease => preRelease.isNotEmpty;
 
+  /// 构建号：无后缀视为 0，纯数字后缀取其数值，其它后缀（`rc.1`）返回 null。
+  int? get _buildNumber {
+    if (preRelease.isEmpty) return 0;
+    return _digits.hasMatch(preRelease) ? int.parse(preRelease) : null;
+  }
+
   /// 是否比 [other] 更新。
   bool isNewerThan(AppVersion other) => compareTo(other) > 0;
 
@@ -44,7 +53,13 @@ class AppVersion implements Comparable<AppVersion> {
     if (major != other.major) return major.compareTo(other.major);
     if (minor != other.minor) return minor.compareTo(other.minor);
     if (patch != other.patch) return patch.compareTo(other.patch);
-    // 正式版优先级高于任何预发布版
+    // 同前缀下若双方都是构建后缀（或无后缀），按构建号比大小
+    final selfBuild = _buildNumber;
+    final otherBuild = other._buildNumber;
+    if (selfBuild != null && otherBuild != null) {
+      return selfBuild.compareTo(otherBuild);
+    }
+    // 其余情况按 semver 规则比较预发布标识：正式版优先级高于任何预发布版
     if (!isPreRelease && other.isPreRelease) return 1;
     if (isPreRelease && !other.isPreRelease) return -1;
     return _comparePreRelease(preRelease, other.preRelease);

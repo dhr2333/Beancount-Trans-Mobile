@@ -4,20 +4,23 @@
  * 流水线目标：
  *   依次完成「共享工具链准备 → 依赖安装 → 静态分析 → 单元测试 → 正式签名注入 →
  *   release APK 构建与归档」，并在 main 分支额外执行语义化发布
- *   （semantic-release 依据 conventional commits 计算版本号、打 tag、创建 GitHub Release，
- *    并把以发布版本号重新构建的已签名 APK 作为 Release 附件上传）。
+ *   （版本号由本地插件 ci/release-version.mjs 接管为 <semver>-<main 提交数>，如 1.2.1-51，
+ *    语义化发布据此打 tag、创建 GitHub Release，并把以该版本号重新构建的已签名 APK 作为附件上传）。
  *
  * 分支策略：
  *   非 main 分支只做校验与构建（不发布、不打 tag）；
  *   main 分支在前述校验与构建之外额外执行语义化发布。
  *
+ * 版本号规则（见 ci/release-version.mjs）：
+ *   版本名 = <semver>-<main 提交数>（如 1.2.1-51），前缀只在 feat / fix / BREAKING CHANGE 时抬高，
+ *   后缀随每次 main 提交 +1；Android versionCode 直接取后缀数字（如 51）。
+ *
  * 关于 main 分支会构建两次 APK（有意为之，非重复劳动）：
- *   1) 第 7 阶段「构建 release APK」以 Jenkins 构建号作为 versionCode，产物归档到 Jenkins，
- *      用于每次提交的冒烟校验与人工下载，且保证任意分支都有统一的构建产物可用；
+ *   1) 第 7 阶段「构建 release APK」用当前 pubspec 前缀 + 本次提交数作为版本名/versionCode，
+ *      产物归档到 Jenkins，用于每次提交的冒烟校验与人工下载，且保证任意分支都有统一的构建产物可用；
  *   2) 第 8 阶段 semantic-release 的 prepare 阶段会调用 ci/release_android.sh，
- *      按 semantic-release 计算出的发布版本号（versionCode = major*10000 + minor*100 + patch）
- *      重新构建一次已签名 APK，并由 publish 阶段作为 GitHub Release 附件上传。
- *   两次构建的版本号语义不同（构建号 vs 发布版本号），故刻意保留两次构建，不做产物复用。
+ *      按插件计算出的发布版本号重新构建一次已签名 APK，并由 publish 阶段作为 GitHub Release 附件上传。
+ *   两次构建的版本号在同一 checkout 下一致（同一次提交），保留两次构建是因为归档时机与用途不同。
  *
  * 注意：本仓库不涉及 Docker 镜像构建与服务器 SSH 部署，所有 flutter/gradle 命令
  *       都先 source 共享工具链目录（TOOLCHAIN_ROOT）下的 env.sh，复用仓库外的缓存与 SDK。
@@ -72,6 +75,20 @@ pipeline {
                     ).trim()
 
                     echo "Git Commit短哈希: ${env.GIT_COMMIT_SHORT}"
+
+                    // 版本号规则与 ci/release-version.mjs 保持一致：
+                    // 版本名 = <pubspec 前缀>-<main 提交数>，Android versionCode 直接取后缀数字
+                    env.VERSION_SUFFIX = sh(
+                        script: 'git rev-list --count HEAD',
+                        returnStdout: true
+                    ).trim()
+                    env.VERSION_PREFIX = sh(
+                        script: "sed -n 's/^version: *\\([0-9]*\\.[0-9]*\\.[0-9]*\\).*/\\1/p' pubspec.yaml | head -1",
+                        returnStdout: true
+                    ).trim()
+                    env.BUILD_VERSION = "${env.VERSION_PREFIX}-${env.VERSION_SUFFIX}"
+
+                    echo "构建版本号: ${env.BUILD_VERSION}（versionCode = ${env.VERSION_SUFFIX}）"
                     echo "工作目录: ${env.WORKSPACE}"
 
                     updateGitHubStatus('pending', '开始构建...')
@@ -156,8 +173,8 @@ pipeline {
         stage('构建 release APK') {
             steps {
                 script {
-                    echo "📦 构建 release APK（versionCode = Jenkins 构建号 ${env.BUILD_NUMBER}）..."
-                    sh ". ${env.TOOLCHAIN_ROOT}/env.sh && flutter build apk --release --build-number=${env.BUILD_NUMBER}"
+                    echo "📦 构建 release APK（versionName = ${env.BUILD_VERSION}，versionCode = ${env.VERSION_SUFFIX}）..."
+                    sh ". ${env.TOOLCHAIN_ROOT}/env.sh && flutter build apk --release --build-name=${env.BUILD_VERSION} --build-number=${env.VERSION_SUFFIX}"
                     archiveArtifacts artifacts: 'build/app/outputs/flutter-apk/app-release.apk', fingerprint: true
                     sh "ls -lh ${env.APK_PATH}"
                 }

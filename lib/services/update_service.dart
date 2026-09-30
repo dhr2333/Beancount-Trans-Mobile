@@ -79,19 +79,18 @@ class UpdateService {
 
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
-  /// 当前版本展示文案（含构建号），如 `1.1.0 (10100)`；读取失败返回空串。
+  /// 当前版本展示文案，如 `1.2.1-51`（版本名本身已带构建后缀）；读取失败返回空串。
   Future<String> currentVersionLabel() async {
     final info = await _packageInfo();
-    if (info == null) return '';
-    return info.buildNumber.isEmpty
-        ? info.version
-        : '${info.version} (${info.buildNumber})';
+    return info?.version ?? '';
   }
 
   /// 检测是否有新版本；已是最新时返回 null，失败时抛出 [UpdateException]。
   Future<UpdateInfo?> checkForUpdate() async {
     final package = await _packageInfo();
-    final current = package == null ? null : AppVersion.tryParse(package.version);
+    final current = package == null
+        ? null
+        : AppVersion.tryParse(package.version);
     if (current == null) {
       throw const UpdateException('无法读取当前版本号');
     }
@@ -149,7 +148,9 @@ class UpdateService {
       throw const UpdateException('该版本未提供 APK 安装包');
     }
     final directory = await getTemporaryDirectory();
-    final file = File('${directory.path}/beancount-trans-${info.latestVersion}.apk');
+    final file = File(
+      '${directory.path}/beancount-trans-${info.latestVersion}.apk',
+    );
     // 重试时清掉上次的残留，避免沿用不完整文件
     if (await file.exists()) await file.delete();
 

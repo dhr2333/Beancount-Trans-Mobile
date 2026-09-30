@@ -27,7 +27,7 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _loading = false;
   String? _error;
 
-  /// 当前版本展示文案（含构建号），读取完成前为空。
+  /// 当前版本展示文案（含构建后缀），读取完成前为空。
   String _versionLabel = '';
   bool _checkingUpdate = false;
 

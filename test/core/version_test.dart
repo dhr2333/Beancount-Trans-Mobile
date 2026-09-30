@@ -21,6 +21,7 @@ void main() {
 
     test('保留预发布标识', () {
       expect(AppVersion.tryParse('1.2.3-rc.1')!.toString(), '1.2.3-rc.1');
+      expect(AppVersion.tryParse('1.2.1-50')!.toString(), '1.2.1-50');
     });
 
     test('非法输入返回 null', () {
@@ -52,6 +53,13 @@ void main() {
       expect(parse('1.2.3-1').isNewerThan(parse('1.2.3-alpha')), isFalse);
       // 段数更少且前缀相同时更小
       expect(parse('1.2.3-rc.1').isNewerThan(parse('1.2.3-rc')), isTrue);
+    });
+
+    test('纯数字后缀是构建号：同前缀按构建号比大小且高于无后缀版本', () {
+      expect(parse('1.2.1-51').isNewerThan(parse('1.2.1-50')), isTrue);
+      expect(parse('1.2.1-50').isNewerThan(parse('1.2.1')), isTrue);
+      expect(parse('1.2.1').isNewerThan(parse('1.2.1-50')), isFalse);
+      expect(parse('1.2.2-51').isNewerThan(parse('1.2.1-50')), isTrue);
     });
 
     test('缺少段位的写法与补零等价', () {
