@@ -58,7 +58,7 @@ class _ReconciliationFormPageState extends State<ReconciliationFormPage> {
       setState(() {
         _start = data;
         _currency = data.defaultCurrency ??
-            (data.balances.isNotEmpty ? data.balances.first.currency : '');
+            (data.balances.isNotEmpty ? data.balances.first.currency : 'CNY');
         _items = [];
       });
     } on ApiException catch (error) {
@@ -71,13 +71,14 @@ class _ReconciliationFormPageState extends State<ReconciliationFormPage> {
   // ---------------------------------------------------------------- 计算
 
   /// 当前币种的预期余额。
+  /// 后端仅返回余额不为 0 的币种，若无匹配币种（如预期余额为 0），按 0 处理。
   String get _expectedBalance {
     final start = _start;
     if (start == null) return '';
     for (final balance in start.balances) {
       if (balance.currency == _currency) return balance.expectedBalance;
     }
-    return '';
+    return '0.00';
   }
 
   /// 基础差额 = 实际余额 − 预期余额。
@@ -430,7 +431,7 @@ class _ReconciliationFormPageState extends State<ReconciliationFormPage> {
                   children: [
                     _buildOverview(theme, start!),
                     const SizedBox(height: 12),
-                    _buildBalances(theme, start),
+                    _buildBalances(start),
                     const SizedBox(height: 12),
                     _buildActualInput(theme),
                     const SizedBox(height: 12),
@@ -514,7 +515,7 @@ class _ReconciliationFormPageState extends State<ReconciliationFormPage> {
     );
   }
 
-  Widget _buildBalances(ThemeData theme, ReconciliationStart start) {
+  Widget _buildBalances(ReconciliationStart start) {
     return Card(
       margin: EdgeInsets.zero,
       child: Padding(
@@ -524,10 +525,10 @@ class _ReconciliationFormPageState extends State<ReconciliationFormPage> {
           children: [
             const SectionTitle('预期余额'),
             if (start.balances.isEmpty)
-              Text(
-                '后端未返回预期余额',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.outline),
+              InfoRow(
+                label: _currency,
+                value: _expectedBalance,
+                monospace: true,
               )
             else
               for (final balance in start.balances)
