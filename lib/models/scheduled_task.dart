@@ -19,7 +19,7 @@ class ScheduledTask {
   });
 
   final int id;
-  final String taskType; // reconciliation | parse_review | entry_review
+  final String taskType; // reconciliation | entry_review | recurring
   final String taskTypeDisplay;
   final String? scheduledDate;
   final String? completedDate;
