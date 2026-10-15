@@ -1,0 +1,4 @@
+Deep blue-green  #0D3038
+Warm orange      #FF9B2F
+Warm white       #F8F7F3
+Teal             #27C5B6

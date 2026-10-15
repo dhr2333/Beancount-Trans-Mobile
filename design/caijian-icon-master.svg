@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>财见 App Icon</title>
+  <desc>Three interwoven angular lines in orange, white, and teal on a deep blue-green background.</desc>
+  <rect width="1024" height="1024" fill="#0D3038"/>
+  <!-- Orange: upper flow -->
+  <path d="M 103,163
+           L 568,515
+           Q 589,531 609,515
+           L 906,281
+           Q 928,264 908,245
+           L 802,163"
+        fill="none" stroke="#FF9B2F" stroke-width="23"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- White: middle layer -->
+  <path d="M 104,322
+           L 568,674
+           Q 590,691 611,674
+           L 906,440
+           Q 927,423 907,404
+           L 853,361"
+        fill="none" stroke="#F8F7F3" stroke-width="23"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Teal: lower layer -->
+  <path d="M 104,481
+           L 568,833
+           Q 590,850 611,833
+           L 906,599
+           Q 928,582 907,563
+           L 853,520"
+        fill="none" stroke="#27C5B6" stroke-width="23"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

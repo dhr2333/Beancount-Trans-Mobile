@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>财见 Android Adaptive Icon Foreground</title>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="23">
+    <path d="M 190,270 L 512,514 Q 532,529 552,514 L 790,326 Q 810,310 790,292 L 720,239" stroke="#FF9B2F"/>
+    <path d="M 190,390 L 512,634 Q 532,649 552,634 L 790,446 Q 810,430 790,412 L 750,382" stroke="#F8F7F3"/>
+    <path d="M 190,510 L 512,754 Q 532,769 552,754 L 790,566 Q 810,550 790,532 L 750,502" stroke="#27C5B6"/>
+  </g>
+</svg>

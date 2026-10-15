@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 自适应图标背景层：取财见色板的深蓝绿 -->
+    <color name="ic_launcher_background">#0D3038</color>
+</resources>

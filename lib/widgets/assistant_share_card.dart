@@ -25,7 +25,7 @@ const Color _kTextTertiary = Color(0xFF909399);
 const Color _kTextFaint = Color(0xFFC0C4CC);
 const Color _kBorder = Color(0xFFEBEEF5);
 const Color _kBorderStrong = Color(0xFFDCDFE6);
-const Color _kAccent = Color(0xFF409EFF);
+const Color _kAccent = Color(0xFF27C5B6);
 
 /// 分享长图卡片：结构、配色与文案对齐 Web 端 `AssistantShareCard.vue`。
 ///

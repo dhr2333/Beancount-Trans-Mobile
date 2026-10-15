@@ -9,8 +9,11 @@ import 'state/auth_store.dart';
 import 'state/theme_store.dart';
 import 'widgets/update_dialog.dart';
 
-/// 品牌主色（亮/暗主题共用同一种子色）。
-const Color _brandSeed = Color(0xFF2F6FED);
+/// 品牌主色（亮/暗主题共用同一种子色，取自财见图标色板的青）。
+const Color _brandSeed = Color(0xFF27C5B6);
+
+/// 暗色主题的底色（财见图标色板的深蓝绿）。
+const Color _brandDarkSurface = Color(0xFF0D3038);
 
 /// 应用根组件：亮/暗主题由 [ThemeStore] 的外观偏好决定。
 class BeancountTransApp extends StatelessWidget {
@@ -33,10 +36,14 @@ class BeancountTransApp extends StatelessWidget {
   }
 
   static ThemeData _buildTheme(Brightness brightness) {
-    final ColorScheme scheme = ColorScheme.fromSeed(
+    final ColorScheme base = ColorScheme.fromSeed(
       seedColor: _brandSeed,
       brightness: brightness,
     );
+    // 暗色下把底色换成品牌深蓝绿，保证图标与界面同属一套色板
+    final ColorScheme scheme = brightness == Brightness.dark
+        ? base.copyWith(surface: _brandDarkSurface)
+        : base;
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
