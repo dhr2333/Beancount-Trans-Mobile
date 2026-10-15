@@ -191,25 +191,30 @@ async function main() {
     console.log('已更新滚动 Release：%s', release.html_url);
   }
 
-  // 2) 先删掉旧的 apk 资产：GitHub 没有资产覆盖接口，同名上传会返回 422
+  // 2) 读取现有 apk 资产并先删掉与新资产同名的那个：
+  //    GitHub 没有资产覆盖接口，同名上传会返回 422，这一步是幂等重跑所必需。
+  //    其余旧资产不在这里删——上传失败时必须留着，否则应用内更新通道会变空。
   const assets = await request(
     `${API}/repos/${repo}/releases/${release.id}/assets?per_page=100`,
     { token },
   );
   ensureOk(assets, '读取滚动 Release 资产失败');
-  for (const asset of assets.data ?? []) {
-    if (!String(asset.name ?? '').toLowerCase().endsWith('.apk')) continue;
+  const existingApk = (assets.data ?? []).filter((asset) =>
+    String(asset.name ?? '').toLowerCase().endsWith('.apk'),
+  );
+  for (const asset of existingApk) {
+    if (asset.name !== assetName) continue;
     const removed = await request(`${API}/repos/${repo}/releases/assets/${asset.id}`, {
       token,
       method: 'DELETE',
     });
     if (!removed.response.ok) {
-      fail(`删除旧资产 ${asset.name} 失败（HTTP ${removed.response.status}）`);
+      fail(`删除同名资产 ${asset.name} 失败（HTTP ${removed.response.status}）`);
     }
-    console.log('已删除旧资产：%s', asset.name);
+    console.log('已删除同名资产：%s', asset.name);
   }
 
-  // 3) 上传本次 APK
+  // 3) 先上传本次 APK：上传失败时旧资产仍在，应用内更新不会断档
   let uploaded;
   try {
     uploaded = await fetch(
@@ -234,6 +239,19 @@ async function main() {
   }
   const asset = await uploaded.json();
   console.log('已上传资产：%s（%d 字节）', asset.name, asset.size ?? size);
+
+  // 4) 上传成功后再清理其它旧资产
+  for (const stale of existingApk) {
+    if (stale.id === asset.id || stale.name === assetName) continue;
+    const removed = await request(`${API}/repos/${repo}/releases/assets/${stale.id}`, {
+      token,
+      method: 'DELETE',
+    });
+    if (!removed.response.ok) {
+      fail(`删除旧资产 ${stale.name} 失败（HTTP ${removed.response.status}）`);
+    }
+    console.log('已删除旧资产：%s', stale.name);
+  }
   console.log('下载地址：%s', asset.browser_download_url);
   console.log('应用内更新将看到：最新 %s（构建 %d）', versionName, build);
 }
