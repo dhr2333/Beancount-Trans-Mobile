@@ -192,7 +192,14 @@ class _LoginPageState extends State<LoginPage> {
             color: theme.colorScheme.primary,
           ),
           const SizedBox(height: 12),
-          Text('Beancount-Trans', style: theme.textTheme.headlineSmall),
+          Text('财见', style: theme.textTheme.headlineSmall),
+          const SizedBox(height: 4),
+          Text(
+            '看清自己的钱，再做决定。',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.outline,
+            ),
+          ),
           const SizedBox(height: 6),
           // Text(
           //   '登录后查看审核待办与账本',

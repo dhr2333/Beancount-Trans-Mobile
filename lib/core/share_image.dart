@@ -82,7 +82,7 @@ Future<void> sharePngBytes(
     ShareParams(
       files: [XFile(file.path, mimeType: 'image/png')],
       text: text,
-      title: 'Beancount-Trans',
+      title: '财见',
     ),
   );
 }

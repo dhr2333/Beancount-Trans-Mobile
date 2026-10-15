@@ -18,10 +18,7 @@ void main() {
       final exp = DateTime.now().add(const Duration(hours: 1));
       final token = fakeJwt({'exp': exp.millisecondsSinceEpoch ~/ 1000});
 
-      expect(
-        jwtExpiresAt(token)!.difference(exp).inSeconds.abs() <= 1,
-        isTrue,
-      );
+      expect(jwtExpiresAt(token)!.difference(exp).inSeconds.abs() <= 1, isTrue);
     });
 
     test('非三段式 token 返回 null', () {
@@ -45,7 +42,11 @@ void main() {
 
     test('剩余有效期大于 leeway 时返回 false', () {
       final token = fakeJwt({
-        'exp': DateTime.now().add(const Duration(minutes: 30)).millisecondsSinceEpoch ~/ 1000,
+        'exp':
+            DateTime.now()
+                .add(const Duration(minutes: 30))
+                .millisecondsSinceEpoch ~/
+            1000,
       });
 
       expect(isJwtExpiringSoon(token), isFalse);
@@ -53,10 +54,18 @@ void main() {
 
     test('已过期或落在 leeway 内时返回 true', () {
       final expired = fakeJwt({
-        'exp': DateTime.now().subtract(const Duration(minutes: 1)).millisecondsSinceEpoch ~/ 1000,
+        'exp':
+            DateTime.now()
+                .subtract(const Duration(minutes: 1))
+                .millisecondsSinceEpoch ~/
+            1000,
       });
       final almostExpired = fakeJwt({
-        'exp': DateTime.now().add(const Duration(minutes: 2)).millisecondsSinceEpoch ~/ 1000,
+        'exp':
+            DateTime.now()
+                .add(const Duration(minutes: 2))
+                .millisecondsSinceEpoch ~/
+            1000,
       });
 
       expect(isJwtExpiringSoon(expired), isTrue);

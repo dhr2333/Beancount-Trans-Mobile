@@ -26,7 +26,7 @@ void main() {
       ]);
 
       expect(tester.takeException(), isNull);
-      expect(find.text('Beancount-Trans'), findsOneWidget);
+      expect(find.text('财见'), findsOneWidget);
       expect(find.text('你的问题'), findsOneWidget);
       expect(find.text('Copilot'), findsOneWidget);
       expect(find.text('本月餐饮花了多少？'), findsOneWidget);
@@ -57,7 +57,10 @@ void main() {
               body: SingleChildScrollView(
                 child: AssistantShareCard(
                   turns: [
-                    AssistantShareTurn(userMessage: '问题', assistantContent: '回答'),
+                    AssistantShareTurn(
+                      userMessage: '问题',
+                      assistantContent: '回答',
+                    ),
                   ],
                 ),
               ),
@@ -72,7 +75,7 @@ void main() {
         kAssistantShareCardWidth,
       );
       expect(
-        MediaQuery.textScalerOf(tester.element(find.text('Beancount-Trans'))),
+        MediaQuery.textScalerOf(tester.element(find.text('财见'))),
         TextScaler.noScaling,
       );
     });

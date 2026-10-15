@@ -21,7 +21,7 @@ class BeancountTransApp extends StatelessWidget {
     return ListenableBuilder(
       listenable: ThemeStore.instance,
       builder: (context, _) => MaterialApp(
-        title: 'Beancount-Trans',
+        title: '财见',
         debugShowCheckedModeBanner: false,
         theme: _buildTheme(Brightness.light),
         darkTheme: _buildTheme(Brightness.dark),

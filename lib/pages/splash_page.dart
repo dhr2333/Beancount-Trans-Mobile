@@ -37,7 +37,14 @@ class _SplashPageState extends State<SplashPage> {
               color: theme.colorScheme.primary,
             ),
             const SizedBox(height: 16),
-            Text('Beancount-Trans', style: theme.textTheme.headlineSmall),
+            Text('财见', style: theme.textTheme.headlineSmall),
+            const SizedBox(height: 4),
+            Text(
+              'by Beancount-Trans',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
             const SizedBox(height: 24),
             const SizedBox(
               width: 22,

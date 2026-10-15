@@ -86,7 +86,7 @@ class AssistantShareCard extends StatelessWidget {
         ),
       ),
       child: const Text(
-        'Beancount-Trans',
+        '财见',
         style: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w700,

@@ -17,7 +17,7 @@ if (hasReleaseKeystore) {
 }
 
 android {
-    namespace = "cn.dhr2333.beancount_trans"
+    namespace = "cn.dhr2333.caijian"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -30,7 +30,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "cn.dhr2333.beancount_trans"
+        applicationId = "cn.dhr2333.caijian"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         // webview_flutter / flutter_secure_storage 要求 minSdk >= 21
