@@ -1,4 +1,5 @@
 import 'package:beancount_trans/widgets/assistant_share_card.dart';
+import 'package:beancount_trans/widgets/markdown_content.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -46,6 +47,36 @@ void main() {
       expect(find.text('对话 2'), findsOneWidget);
       expect(find.text('问题一'), findsOneWidget);
       expect(find.text('问题二'), findsOneWidget);
+    });
+
+    testWidgets('宽表格在分享图内收缩换行，内容不被裁掉', (tester) async {
+      const table = '''
+| 一级类目 | 近 24 个月 | 近 12 个月 | 近 6 个月 |
+| --- | --- | --- | --- |
+| 餐饮（Expenses:Food） | 54,287.94 | 32,456.00 | 18,000.00 |
+| 居家生活（Expenses:Home） | 216,562.66 | 13,238.00 | 8,000.00 |
+''';
+
+      await _pump(tester, const [
+        AssistantShareTurn(userMessage: '各分类支出？', assistantContent: table),
+      ]);
+
+      expect(tester.takeException(), isNull);
+
+      final tableSize = tester.getSize(find.byType(Table));
+      // 卡片内容区宽度 = 卡片宽度 - 左右内边距
+      expect(tableSize.width, lessThanOrEqualTo(kAssistantShareCardWidth - 48));
+
+      // 分享图不可滚动，不应出现横向滚动容器
+      final horizontalViews = tester
+          .widgetList<SingleChildScrollView>(
+            find.descendant(
+              of: find.byType(MarkdownContent),
+              matching: find.byType(SingleChildScrollView),
+            ),
+          )
+          .where((view) => view.scrollDirection == Axis.horizontal);
+      expect(horizontalViews, isEmpty);
     });
 
     testWidgets('卡片固定宽度且忽略系统字体缩放，保证分享图输出稳定', (tester) async {

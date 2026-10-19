@@ -14,6 +14,7 @@ class MarkdownContent extends StatelessWidget {
     required this.content,
     this.baseStyle,
     this.selectable = true,
+    this.fitTableWidth = false,
   });
 
   final String content;
@@ -23,6 +24,12 @@ class MarkdownContent extends StatelessWidget {
 
   /// 是否允许选中复制；离屏渲染成分享图时传 `false`（无需交互且更省开销）。
   final bool selectable;
+
+  /// 表格收缩到容器宽度并自动换行。
+  ///
+  /// 分享图等不可滚动场景传 `true`，保证超宽表格不会被裁掉；聊天正文传
+  /// `false` 时超宽表格保持横向滚动。
+  final bool fitTableWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +108,9 @@ class MarkdownContent extends StatelessWidget {
               tableHeadAlign: TextAlign.left,
               tableBorder: TableBorder.all(color: scheme.outlineVariant),
               // IntrinsicColumnWidth 才会触发库内横向滚动；自定义上限避免长文本撑成单行。
-              tableColumnWidth: const _ScrollableTableColumnWidth(),
+              tableColumnWidth: fitTableWidth
+                  ? const _FitTableColumnWidth()
+                  : const _ScrollableTableColumnWidth(),
               tableScrollbarThumbVisibility: false,
               tableCellsPadding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
               tableHeadCellsDecoration: BoxDecoration(
@@ -162,4 +171,28 @@ class _ScrollableTableColumnWidth extends IntrinsicColumnWidth {
   @override
   double minIntrinsicWidth(Iterable<RenderBox> cells, double containerWidth) =>
       math.min(super.minIntrinsicWidth(cells, containerWidth), _maxColumnWidth);
+}
+
+/// 分享图等不可滚动场景的表格列宽：列可被压缩到 0 并让长文本换行。
+///
+/// 不继承 [IntrinsicColumnWidth]，因此库内不会包横向滚动容器；表格宽度受
+/// 容器约束，列宽不足时文字自动换行，保证整张表完整出现在图片里。
+class _FitTableColumnWidth implements TableColumnWidth {
+  const _FitTableColumnWidth();
+
+  @override
+  double minIntrinsicWidth(Iterable<RenderBox> cells, double containerWidth) =>
+      0;
+
+  @override
+  double maxIntrinsicWidth(Iterable<RenderBox> cells, double containerWidth) {
+    var result = 0.0;
+    for (final cell in cells) {
+      result = math.max(result, cell.getMaxIntrinsicWidth(double.infinity));
+    }
+    return math.min(result, _ScrollableTableColumnWidth._maxColumnWidth);
+  }
+
+  @override
+  double? flex(Iterable<RenderBox> cells) => null;
 }

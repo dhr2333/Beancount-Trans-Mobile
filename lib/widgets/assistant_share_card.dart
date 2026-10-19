@@ -135,6 +135,8 @@ class AssistantShareCard extends StatelessWidget {
         MarkdownContent(
           content: turn.assistantContent,
           selectable: false,
+          // 分享图不可滚动：表格收缩到卡片宽度内并换行，避免右侧内容被裁掉。
+          fitTableWidth: true,
           baseStyle: const TextStyle(
             fontSize: 14,
             height: 1.6,

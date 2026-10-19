@@ -114,6 +114,51 @@ void main() {
       expect(noteSize.height, greaterThan(amountSize.height + 8));
     });
 
+    testWidgets('fitTableWidth 时超宽表格压缩到容器内并换行', (tester) async {
+      const table = '''
+| 账户名称 | 交易日期 | 对手方 | 摘要说明 | 借方金额 | 贷方金额 | 余额 | 备注信息 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 餐饮 | 2026-10-01 | 某餐厅 | 聚餐 | 1200 | 0 | 800 | 团建 |
+''';
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 360,
+                child: MarkdownContent(content: table, fitTableWidth: true),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      // 表格整体不超过容器宽度，右侧列不会被裁掉
+      expect(tester.getSize(find.byType(Table)).width, lessThanOrEqualTo(360));
+
+      // 不再生成横向滚动容器
+      final horizontalViews = tester
+          .widgetList<SingleChildScrollView>(
+            find.descendant(
+              of: find.byType(MarkdownContent),
+              matching: find.byType(SingleChildScrollView),
+            ),
+          )
+          .where((view) => view.scrollDirection == Axis.horizontal);
+      expect(horizontalViews, isEmpty);
+
+      // 列被压缩后文本自动换行（高度超过单行）
+      final dateSize = tester.getSize(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Text && widget.textSpan?.toPlainText() == '2026-10-01',
+        ),
+      );
+      expect(dateSize.height, greaterThan(25));
+    });
+
     testWidgets('列过多时表格可横向滑动且不显示滚动条', (tester) async {
       const table = '''
 | 账户名称 | 交易日期 | 对手方 | 摘要说明 | 借方金额 | 贷方金额 | 余额 | 备注信息 |
