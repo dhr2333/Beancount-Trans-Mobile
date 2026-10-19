@@ -16,6 +16,7 @@ import '../../services/translate_service.dart';
 import '../../state/shared_ledger_store.dart';
 import '../../widgets/add_shared_ledger_sheet.dart';
 import '../../widgets/assistant_share_card.dart';
+import '../../widgets/drawer_swipe_layer.dart';
 import '../../widgets/markdown_content.dart';
 import '../../widgets/status_chip.dart';
 import '../fava_page.dart';
@@ -1185,8 +1186,9 @@ class _AssistantChatPageState extends State<AssistantChatPage>
         onOpenProfile: _onOpenProfile,
         onRefresh: _refreshDrawerData,
       ),
-      // 整屏均可横向右滑拖出抽屉（默认只响应左侧 20dp 的边缘拖动）
-      drawerEdgeDragWidth: MediaQuery.sizeOf(context).width,
+      // 关闭 Scaffold 自带的整屏拖动层，改用 _DrawerSwipeLayer：
+      // 落在表格/代码块上的横向拖动交给内部滚动，其余区域右滑打开抽屉。
+      drawerEnableOpenDragGesture: false,
       // 打开抽屉时刷新会话列表与待办徽标
       onDrawerChanged: (isOpened) {
         if (isOpened) _refreshDrawerData();
@@ -1194,14 +1196,17 @@ class _AssistantChatPageState extends State<AssistantChatPage>
       appBar: _shareSelecting ? _buildShareAppBar() : _buildChatAppBar(canChat),
       body: _loading && _messages.isEmpty
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                if (_error != null) _errorBanner(_error!),
-                Expanded(child: _buildMessageList()),
-                _shareSelecting
-                    ? _buildShareActionBar()
-                    : _buildInputBar(canChat),
-              ],
+          : DrawerSwipeLayer(
+              onOpen: () => _scaffoldKey.currentState?.openDrawer(),
+              child: Column(
+                children: [
+                  if (_error != null) _errorBanner(_error!),
+                  Expanded(child: _buildMessageList()),
+                  _shareSelecting
+                      ? _buildShareActionBar()
+                      : _buildInputBar(canChat),
+                ],
+              ),
             ),
     );
   }
