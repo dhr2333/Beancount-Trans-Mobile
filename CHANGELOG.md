@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.2.2](https://github.com/dhr2333/Beancount-Trans-Mobile/compare/1.2.1...1.2.2) (2026-10-19)
+
+### Bug Fixes
+
+* **copilot:** 修复生成的分享图表格内容被截断的问题 ([8a4b2b1](https://github.com/dhr2333/Beancount-Trans-Mobile/commit/8a4b2b14cff497ac13813c8f64ac4f0f9b7a8dd6))
+* **copilot:** 修复表格内容过长时被截断的缺陷 ([4d19821](https://github.com/dhr2333/Beancount-Trans-Mobile/commit/4d198219d3917efd631efbda02333c1ba3a58246))
+
+### Code Refactoring
+
+* 重构发布流水线与更新检查逻辑 ([7fe92a1](https://github.com/dhr2333/Beancount-Trans-Mobile/commit/7fe92a16f356c2bef6d988c05f6a1ee0fe0f42f6))
+
+### Styles
+
+* **assistant chat:** 优化聊天页滚动粘底逻辑，修复反向列表问题 ([3b4e859](https://github.com/dhr2333/Beancount-Trans-Mobile/commit/3b4e8591bd6201349d6c47259d79e5f07aa2812c))
+
+### Miscellaneous Chores
+
+* **branding:** 对齐应用配色与启动图标至新设计系统 ([802d1c1](https://github.com/dhr2333/Beancount-Trans-Mobile/commit/802d1c1f308627e8e5b2fd67be5226986b299c17))
+* **ci/publish:** 调整发布脚本资源清理逻辑避免应用内更新中断 ([8d50d14](https://github.com/dhr2333/Beancount-Trans-Mobile/commit/8d50d148e01ba3c20839ba23542c4cdafa27c807))
+* **project:** 重命名项目为财见 ([602eddc](https://github.com/dhr2333/Beancount-Trans-Mobile/commit/602eddccf44bf0ca75f06fb05beb94d406510c98))
+* **reconciliation:** 更新待办类型注释 ([ec1b1cd](https://github.com/dhr2333/Beancount-Trans-Mobile/commit/ec1b1cdacce72b97f5e88f27abbec4bd43dfcfe7))
+* **reconcliation:** 修复对账待办提示未返回预期余额而不是0的问题 ([476ff9c](https://github.com/dhr2333/Beancount-Trans-Mobile/commit/476ff9c2d7d0c09a873fd509d435d43b23660d1e))
+* **release:** 改用带提交数后缀的版本号发布规则 ([46f4c6f](https://github.com/dhr2333/Beancount-Trans-Mobile/commit/46f4c6fb30f288211b26230036b52ef2b703cacd))
+* **助手聊天页:** 移除无法聊天时的底部提示文案 ([a1c1933](https://github.com/dhr2333/Beancount-Trans-Mobile/commit/a1c1933abd6a9bb0ea7e350e7ca099cd976b8c37))
+
+### Others
+
+* Merge branch 'main' of https://github.com/dhr2333/Beancount-Trans-Mobile ([a5e8894](https://github.com/dhr2333/Beancount-Trans-Mobile/commit/a5e889457f774370dce0fca421598fc410e3e462))
+
 ## [1.2.1](https://github.com/dhr2333/Beancount-Trans-Mobile/compare/1.2.0...1.2.1) (2026-09-29)
 
 ### Bug Fixes
